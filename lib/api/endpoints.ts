@@ -1,0 +1,38 @@
+export const endpoints = {
+  auth: {
+    login: '/auth/login',
+  },
+  admin: {
+    monitoringSiswa: '/admin/monitoring/siswa',
+    monitoringKunjungan: '/admin/monitoring/kunjungan',
+    guru: '/admin/guru',
+    guruActive: '/admin/guru?status=AKTIF',
+    guruStatus: (id: string | number) => `/admin/guru/${id}/status`,
+    siswa: '/admin/siswa',
+    siswaStatus: (id: string | number) => `/admin/siswa/${id}/status`,
+    mitra: '/admin/mitra',
+    verifyMitra: (id: string | number) => `/admin/mitra/${id}/verifikasi`,
+    penempatan: '/admin/penempatan',
+    penempatanStatus: (id: string | number) => `/admin/penempatan/${id}/status`,
+    pengajuanMagang: '/admin/pengajuan-magang',
+    applicationStatus: (id: string | number) => `/admin/pengajuan-magang/${id}/status`,
+  },
+  guru: {
+    siswa: '/guru/siswa',
+    siswaDetail: (id: string | number) => `/guru/siswa/${id}`,
+    studentGrade: (id: string | number) => `/guru/siswa/${id}/nilai`,
+    jurnal: '/guru/jurnal',
+    journalDecision: (id: string | number) => `/guru/jurnal/${id}/keputusan`,
+    kunjungan: '/guru/kunjungan',
+    dudiBimbingan: '/guru/dudi-bimbingan',
+  },
+  siswa: {
+    dashboard: '/siswa/dashboard',
+    jurnal: '/siswa/jurnal',
+    absenMasuk: '/siswa/absen/masuk',
+    absenKeluar: '/siswa/absen/keluar',
+    pengajuanMagang: '/siswa/pengajuan-magang',
+    adminPerusahaan: '/siswa/admin/perusahaan',
+  },
+  password: (role: string) => `/${role}/akun/ganti-password`,
+};
