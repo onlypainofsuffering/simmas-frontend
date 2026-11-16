@@ -233,7 +233,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     <div className="space-y-5">
       <PageHeader
         description={<>Kelola dan pantau data {section.replaceAll('-', ' ')}.</>}
-        hint="Data dimuat langsung dari API SIMMAS."
+      
       >
         {cfg.createPath && (
           <Button onClick={() => openForm()}>

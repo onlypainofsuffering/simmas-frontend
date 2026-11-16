@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { dataOf, getUser, label, rowsOf } from '@/lib/api/client';
 import { formatFullDate } from '@/lib/utils/format-date';
@@ -208,12 +209,12 @@ export default function Dashboard({ role }: { role: string }) {
     value: number;
     detail: string;
     tone: 'blue' | 'purple' | 'green' | 'amber';
+    href?: string;
   };
   const adminCards: CardItem[] = [
-    { title: 'Total Siswa', value: students.length, detail: 'Data siswa terdaftar', tone: 'blue' },
-    { title: 'Guru Pembimbing', value: teachers.length, detail: 'Guru terdaftar', tone: 'purple' },
-    { title: 'Mitra DUDI', value: companies.length, detail: 'Perusahaan mitra', tone: 'green' },
-    { title: 'Menunggu Validasi', value: applications.length, detail: 'Pengajuan menunggu keputusan', tone: 'amber' },
+    { title: 'Total Siswa', value: students.length, detail: 'Data siswa terdaftar', tone: 'blue', href: '/admin/siswa' },
+    { title: 'Guru Pembimbing', value: teachers.length, detail: 'Guru terdaftar', tone: 'purple', href: '/admin/guru' },
+    { title: 'Mitra DUDI', value: companies.length, detail: 'Perusahaan mitra', tone: 'green', href: '/admin/dudi' },
   ];
   const guruCards: CardItem[] = [
     { title: 'Siswa Bimbingan', value: students.length, detail: 'Siswa aktif magang', tone: 'blue' },
@@ -241,31 +242,51 @@ export default function Dashboard({ role }: { role: string }) {
         </p>
       </div>
       {errors.length > 0 && <Feedback err={errors.join(' ')} notice="" />}
-      <div className={`grid gap-3 ${role === 'admin' ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-3'}`}>
-        {cards.map(card => (
-          <StatCard
-            key={card.title}
-            title={card.title}
-            value={loading ? '—' : card.value}
-            detail={card.detail}
-            tone={card.tone}
-          />
-        ))}
+      <div className={`grid gap-3 ${role === 'admin' ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-3'}`}>
+        {cards.map(card =>
+          card.href ? (
+            <Link
+              key={card.title}
+              href={card.href}
+              className="block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"
+            >
+              <StatCard
+                title={card.title}
+                value={loading ? '—' : card.value}
+                detail={card.detail}
+                tone={card.tone}
+              />
+            </Link>
+          ) : (
+            <StatCard
+              key={card.title}
+              title={card.title}
+              value={loading ? '—' : card.value}
+              detail={card.detail}
+              tone={card.tone}
+            />
+          ),
+        )}
       </div>
       {role === 'admin' ? (
         <div className="grid gap-4 lg:grid-cols-5">
-          <Card className="p-5 lg:col-span-3">
-            <h3 className="text-sm font-bold text-slate-800">Status Pengajuan Magang</h3>
-            <p className="mt-1 text-[11px] text-slate-400">Ringkasan permohonan yang menunggu keputusan admin.</p>
-            <div className="mt-6 flex items-center justify-between rounded-lg bg-amber-50 p-4">
-              <span className="text-xs font-medium text-amber-800">Menunggu validasi</span>
-              <span className="text-lg font-bold text-amber-700">{loading ? '—' : applications.length}</span>
-            </div>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full w-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400" />
-            </div>
-            <p className="mt-2 text-[10px] text-slate-400">Daftar pada dashboard mengikuti endpoint pengajuan yang menunggu keputusan.</p>
-          </Card>
+          <Link
+            href="/admin/penempatan"
+            className="block rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 lg:col-span-3"
+          >
+            <Card className="h-full p-5 transition hover:shadow-md">
+              <h3 className="text-sm font-bold text-slate-800">Status Pengajuan Magang</h3>
+              <p className="mt-1 text-[11px] text-slate-400">Ringkasan permohonan yang menunggu keputusan admin.</p>
+              <div className="mt-6 flex items-center justify-between rounded-lg bg-amber-50 p-4">
+                <span className="text-xs font-medium text-amber-800">Menunggu validasi</span>
+                <span className="text-lg font-bold text-amber-700">{loading ? '—' : applications.length}</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400" />
+              </div>
+              <p className="mt-2 text-[10px] text-slate-400">Daftar pada dashboard mengikuti endpoint pengajuan yang menunggu keputusan.</p>
+            </Card>
+          </Link>
           <Card className="p-5 lg:col-span-2">
             <h3 className="text-sm font-bold text-slate-800">Aktivitas Kunjungan</h3>
             <p className="mt-1 text-[11px] text-slate-400">Catatan kunjungan terbaru guru pembimbing.</p>
