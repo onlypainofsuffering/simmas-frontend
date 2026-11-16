@@ -235,11 +235,6 @@ export default function Dashboard({ role }: { role: string }) {
           Portal {role} · {formatFullDate()}
         </div>
         <h2 className="mt-2 text-xl font-bold">Selamat datang kembali, {label(name)}</h2>
-        <p className="mt-1 text-xs text-blue-100">
-          {role === 'admin'
-            ? `${applications.length} pengajuan menunggu validasi Anda.`
-            : `${journals.length} jurnal bimbingan menunggu evaluasi.`}
-        </p>
       </div>
       {errors.length > 0 && <Feedback err={errors.join(' ')} notice="" />}
       <div className={`grid gap-3 ${role === 'admin' ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-3'}`}>
@@ -277,14 +272,7 @@ export default function Dashboard({ role }: { role: string }) {
             <Card className="h-full p-5 transition hover:shadow-md">
               <h3 className="text-sm font-bold text-slate-800">Status Pengajuan Magang</h3>
               <p className="mt-1 text-[11px] text-slate-400">Ringkasan permohonan yang menunggu keputusan admin.</p>
-              <div className="mt-6 flex items-center justify-between rounded-lg bg-amber-50 p-4">
-                <span className="text-xs font-medium text-amber-800">Menunggu validasi</span>
-                <span className="text-lg font-bold text-amber-700">{loading ? '—' : applications.length}</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-full rounded-full bg-gradient-to-r from-blue-500 to-sky-400" />
-              </div>
-              <p className="mt-2 text-[10px] text-slate-400">Daftar pada dashboard mengikuti endpoint pengajuan yang menunggu keputusan.</p>
+              <p className="mt-6 text-xs text-slate-500">Lihat detail pengajuan pada halaman penempatan.</p>
             </Card>
           </Link>
           <Card className="p-5 lg:col-span-2">
