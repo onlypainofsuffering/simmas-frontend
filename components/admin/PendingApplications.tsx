@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Check, RefreshCw, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { label, rowsOf } from '@/lib/api/client';
 import { idOf } from '@/lib/utils/resource';
 import { adminService } from '@/services/admin.service';
@@ -80,9 +80,6 @@ export default function PendingApplications() {
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
             {applications.length} pengajuan
           </span>
-          <Button variant="light" onClick={load}>
-            <RefreshCw size={13} /> Refresh
-          </Button>
         </div>
       </div>
       <Feedback err={err} notice={notice} />

@@ -61,26 +61,8 @@ export default function Dashboard({ role }: { role: string }) {
       if (active) setLoading(false);
     });
 
-    const refreshStudentDashboard = () => {
-      if (document.visibilityState !== 'visible') return;
-      siswaService
-        .getDashboard()
-        .then(response => {
-          if (active) setDatasets(current => ({ ...current, dashboard: response }));
-        })
-        .catch(error => {
-          if (active) {
-            const message = error instanceof Error ? error.message : 'Gagal memuat dashboard siswa.';
-            setErrors(current => (current.includes(message) ? current : [...current, message]));
-          }
-        });
-    };
-
-    if (role === 'siswa') window.addEventListener('focus', refreshStudentDashboard);
-
     return () => {
       active = false;
-      if (role === 'siswa') window.removeEventListener('focus', refreshStudentDashboard);
     };
   }, [role]);
 

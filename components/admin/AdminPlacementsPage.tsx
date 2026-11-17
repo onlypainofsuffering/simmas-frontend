@@ -5,7 +5,7 @@ export default function AdminPlacementsPage() {
   return (
     <div className="space-y-5">
       <PendingApplications />
-      <ResourcePage role="admin" section="penempatan-data" />
+      <ResourcePage role="admin" section="Penempatan Data" />
     </div>
   );
 }

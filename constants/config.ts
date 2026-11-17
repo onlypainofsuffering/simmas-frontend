@@ -11,7 +11,7 @@ export const titles: Record<string, string> = {
   guru: 'Data Guru',
   mitra: 'Data DUDI',
   penempatan: 'Penempatan Magang',
-  'penempatan-data': 'Data Penempatan',
+  'Penempatan Data': 'Data Penempatan',
   password: 'Pengaturan Sistem',
   audit: 'Log Aktivitas & Audit',
   'dudi-bimbingan': 'DUDI Bimbingan',

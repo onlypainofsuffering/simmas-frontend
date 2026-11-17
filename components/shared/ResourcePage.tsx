@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Eye, Filter, Pencil, Plus, RefreshCw, Save, Search, Trash2, X } from 'lucide-react';
+import { Check, Eye, Filter, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
 import { api, dataOf, json, label, rowsOf } from '@/lib/api/client';
 import { resourceConfigs, preferredColumns, statusChoices } from '@/constants/resource-config';
 import { cellValue, idOf, titleCase } from '@/lib/utils/resource';
@@ -36,13 +36,14 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [detail, setDetail] = useState<Row | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
+  const [kelasOptions, setKelasOptions] = useState<string[]>([]);
 
   const fields = edit ? cfg.editFields || cfg.fields || [] : cfg.fields || [];
 
   // Endpoint /admin/penempatan/:id memakai ID siswa (lihat AdminService.updatePenempatan),
   // sedangkan baris penempatan adalah data pengajuan yang memiliki `id` sendiri.
   const rowId = (item: Row) => {
-    if (role === 'admin' && section === 'penempatan-data') {
+    if (role === 'admin' && section === 'Penempatan Data') {
       const siswaId = item.siswa?.id ?? item.siswaId ?? item.id;
       return siswaId === null || siswaId === undefined ? '' : String(siswaId);
     }
@@ -66,7 +67,12 @@ export default function ResourcePage({ role, section }: { role: string; section:
       });
       const suffix = params.toString();
       const result = await api(`${cfg.path}${suffix ? `?${suffix}` : ''}`);
-      setData(rowsOf(result));
+      const rows = rowsOf(result);
+      setData(rows);
+      const kelasValues = rows.map(row => String(row.kelas ?? row.siswa?.kelas ?? '')).filter(Boolean);
+      if (kelasValues.length) {
+        setKelasOptions(prev => Array.from(new Set([...prev, ...kelasValues])).sort((a, b) => a.localeCompare(b)));
+      }
     } catch (error) {
       setErr(error instanceof Error ? error.message : 'Gagal memuat data.');
     } finally {
@@ -240,11 +246,6 @@ export default function ResourcePage({ role, section }: { role: string; section:
             <Plus size={16} /> Tambah Data
           </Button>
         )}
-        {cfg.path && (
-          <Button variant="light" onClick={load}>
-            <RefreshCw size={15} /> Refresh
-          </Button>
-        )}
       </PageHeader>
 
       {cfg.path && (
@@ -267,9 +268,16 @@ export default function ResourcePage({ role, section }: { role: string; section:
             <Filter size={15} /> Filter
           </div>
           {cfg.filters.map(key => (
-            <label key={key} className="min-w-10 flex-1 text-[11px] font-semibold text-slate-500">
+            <label key={key} className="w-full text-[11px] font-semibold text-slate-500 sm:w-44 sm:flex-none">
               {titleCase(key)}
-              {key === 'status' || key === 'jurusan' ? (
+              {key === 'kelas' && kelasOptions.length ? (
+                <Select className="mt-1" value={filters[key] || ''} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>
+                  <option value="">Semua</option>
+                  {kelasOptions.map(value => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </Select>
+              ) : key === 'status' || key === 'jurusan' ? (
                 <Select className="mt-1" value={filters[key] || ''} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>
                   <option value="">Semua</option>
                   {(key === 'jurusan' ? ['RPL', 'TKJ', 'MM'] : statusChoices[section] || ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS']).map(value => (
@@ -286,9 +294,6 @@ export default function ResourcePage({ role, section }: { role: string; section:
               )}
             </label>
           ))}
-          <Button variant="light" onClick={() => setFilters({})}>
-            Reset
-          </Button>
         </div>
       ) : null}
 
@@ -296,7 +301,6 @@ export default function ResourcePage({ role, section }: { role: string; section:
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-sm font-bold text-slate-800">Daftar {titleCase(section)}</h2>
-            <p className="mt-1 text-[11px] text-slate-400">{filtered.length} data ditemukan</p>
           </div>
           <SearchInput value={query} onChange={setQuery} />
         </div>
@@ -355,7 +359,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                         )}
                         {cfg.actions?.includes('status') && (
                           <ActionButton title="Ubah status" onClick={() => action(item, 'status')} color="text-amber-600">
-                            <RefreshCw size={15} />
+                            <Pencil size={15} />
                           </ActionButton>
                         )}
                         {cfg.actions?.includes('verify') && (
@@ -446,7 +450,9 @@ export default function ResourcePage({ role, section }: { role: string; section:
               .map(([key, value]) => (
                 <div key={key} className="rounded-lg bg-slate-50 p-3">
                   <div className="text-[10px] uppercase text-slate-400">{titleCase(key)}</div>
-                  <div className="mt-1 break-words text-xs font-medium text-slate-700">{label(value)}</div>
+                  <div className="mt-1 break-words text-xs font-medium text-slate-700">
+                    <DetailValue value={value} />
+                  </div>
                 </div>
               ))}
           </div>
@@ -459,6 +465,31 @@ export default function ResourcePage({ role, section }: { role: string; section:
       )}
     </div>
   );
+}
+
+function DetailValue({ value }: { value: any }) {
+  if (value === null || value === undefined || value === '') return <>-</>;
+  if (Array.isArray(value)) {
+    if (!value.length) return <>-</>;
+    return <>{value.map(item => (typeof item === 'object' ? label(item) : String(item))).join(', ')}</>;
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value).filter(
+      ([key]) => key !== 'format' && !key.toLowerCase().includes('id') && !key.toLowerCase().includes('password'),
+    );
+    if (!entries.length) return <>{label(value)}</>;
+    return (
+      <div className="space-y-1">
+        {entries.map(([key, item]) => (
+          <div key={key} className="flex items-start justify-between gap-2">
+            <span className="text-[10px] uppercase text-slate-400">{titleCase(key)}</span>
+            <span className="text-right">{label(item)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return <>{label(value)}</>;
 }
 
 function ActionButton({ title, onClick, color, children }: { title: string; onClick: () => void; color: string; children: React.ReactNode }) {

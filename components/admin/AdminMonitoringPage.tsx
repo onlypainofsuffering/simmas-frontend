@@ -26,7 +26,7 @@ export default function AdminMonitoringPage() {
           Kunjungan Guru Pembimbing
         </button>
       </div>
-      <ResourcePage role="admin" section={tab === 'siswa' ? 'monitoring-siswa' : 'monitoring-kunjungan'} />
+      <ResourcePage role="admin" section={tab === 'siswa' ? 'monitoring siswa' : 'Monitoring Kunjungan'} />
     </div>
   );
 }

@@ -14,6 +14,18 @@ Frontend Next.js 14 + TypeScript + Tailwind CSS untuk sistem manajemen magang.
 - Guru: `/guru/dashboard`, `/guru/bimbingan`, `/guru/jurnal-absensi`, `/guru/kunjungan`
 - Siswa: `/siswa/dashboard`, `/siswa/pengajuan`, `/siswa/absensi`, `/siswa/jurnal`
 
+## Deploy ke Vercel
+1. Import repository ini di dashboard Vercel, atau jalankan `npx vercel link` untuk menautkan project.
+2. Salin nilai `orgId` dan `projectId` dari `.vercel/project.json`.
+3. Tambahkan repository secrets di GitHub (`Settings > Secrets and variables > Actions`):
+   - `VERCEL_TOKEN`: token dari https://vercel.com/account/tokens
+   - `VERCEL_ORG_ID`: nilai `orgId`
+   - `VERCEL_PROJECT_ID`: nilai `projectId`
+4. Tambahkan environment variable `NEXT_PUBLIC_API_URL` di Vercel (`Settings > Environment Variables`) untuk Production, Preview, dan Development.
+5. Push ke branch `main` untuk deploy production; pull request ke `main` akan membuat preview deployment dan menautkan URL-nya di komentar PR.
+
+Workflow deploy ada di `.github/workflows/deploy.yml` dan dapat dijalankan manual melalui tab Actions (`workflow_dispatch`).
+
 ## Catatan integrasi
 - Semua request memakai `Authorization: Bearer <token>` setelah login.
 - Bentuk response login dideteksi dari `access_token`, `accessToken`, atau `token`, serta role dari object user. Jika backend memakai nama field berbeda, sesuaikan `lib/auth/auth.service.ts`.

@@ -18,7 +18,7 @@ export default function Header({ role, title, name, passwordUrl, onOpenMenu, onL
   const [profileOpen, setProfileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-slate-100 bg-white/95 px-5 backdrop-blur md:px-8">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-100 bg-white/95 px-5 backdrop-blur md:px-8">
       <div className="flex items-center gap-3">
         <button className="rounded-lg p-2 hover:bg-slate-100 lg:hidden" onClick={onOpenMenu} aria-label="Buka menu">
           <Menu size={20} />

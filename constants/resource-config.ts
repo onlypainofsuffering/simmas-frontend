@@ -12,8 +12,8 @@ export const companyFields: Field[] = [
 export const resourceConfigs: Record<string, PageConfig> = {
   'admin:dashboard': { kind: 'dashboard' },
   'admin:monitoring-global': { kind: 'monitoring' },
-  'admin:monitoring-siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'] },
-  'admin:monitoring-kunjungan': { path: '/admin/monitoring/kunjungan' },
+  'admin:monitoring siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'] },
+  'admin:Monitoring Kunjungan': { path: '/admin/monitoring/kunjungan' },
   'admin:pengajuan-magang': { path: '/admin/pengajuan-magang', actions: ['approve', 'reject'] },
   'admin:siswa': {
     path: '/admin/siswa',
@@ -57,7 +57,7 @@ export const resourceConfigs: Record<string, PageConfig> = {
     actions: ['edit', 'delete', 'verify'],
   },
   'admin:penempatan': { kind: 'placement' },
-  'admin:penempatan-data': {
+  'admin:Penempatan Data': {
     path: '/admin/penempatan',
     filters: ['kelas', 'dudiId', 'status'],
     fields: [
@@ -112,16 +112,16 @@ export const statusChoices: Record<string, string[]> = {
   siswa: ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS'],
   mitra: ['TERVERIFIKASI', 'MENUNGGU_VALIDASI'],
   penempatan: ['SEDANG_MAGANG', 'LULUS'],
-  'penempatan-data': ['SEDANG_MAGANG', 'LULUS'],
+  'Penempatan Data': ['SEDANG_MAGANG', 'LULUS'],
 };
 
 export const preferredColumns: Record<string, string[]> = {
-  'admin:monitoring-siswa': ['nama', 'kelas', 'dudi', 'pembimbing', 'kehadiran', 'jumlah_jurnal', 'status'],
-  'admin:monitoring-kunjungan': ['tanggal', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
+  'admin:monitoring siswa': ['nama', 'kelas', 'dudi', 'pembimbing', 'kehadiran', 'jumlah_jurnal', 'status'],
+  'admin:Monitoring Kunjungan': ['tanggal', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
   'admin:siswa': ['nama', 'nis', 'kelas', 'status'],
   'admin:guru': ['namalengkap', 'nip', 'alamat' , 'jurusan', 'status'],
   'admin:mitra': ['nama_perusahaan', 'bidang_usaha', 'direktur' , 'alamat', 'kontak', 'status'],
-  'admin:penempatan-data': ['siswa', 'dudi', 'guruPembimbing', 'posisi', 'status'],
+  'admin:Penempatan Data': ['siswa', 'dudi', 'guruPembimbing', 'posisi', 'status'],
   'guru:siswa': ['siswa', 'penempatan'],
   'guru:dudi-bimbingan': ['nama_perusahaan', 'bidang_usaha', 'alamat', 'kontak'],
   'guru:jurnal': ['tanggalPelaksana', 'siswa', 'rincianKegiatan', 'status'],
