@@ -15,6 +15,16 @@ export const resourceConfigs: Record<string, PageConfig> = {
   'admin:monitoring siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'] },
   'admin:Monitoring Kunjungan': { path: '/admin/monitoring/kunjungan' },
   'admin:pengajuan-magang': { path: '/admin/pengajuan-magang', actions: ['approve', 'reject'] },
+  'admin:kelas': {
+    path: '/admin/kelas',
+    createPath: '/admin/kelas',
+    filters: ['jurusan'],
+    fields: [
+      { name: 'nama', label: 'Nama Kelas', required: true },
+      { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'] },
+    ],
+    actions: ['edit', 'delete'],
+  },
   'admin:siswa': {
     path: '/admin/siswa',
     createPath: '/admin/siswa',
@@ -116,6 +126,7 @@ export const statusChoices: Record<string, string[]> = {
 };
 
 export const preferredColumns: Record<string, string[]> = {
+  'admin:kelas': ['nama', 'jurusan'],
   'admin:monitoring siswa': ['nama', 'kelas', 'dudi', 'pembimbing', 'kehadiran', 'jumlah_jurnal', 'status'],
   'admin:Monitoring Kunjungan': ['tanggal', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
   'admin:siswa': ['nama', 'nis', 'kelas', 'status'],

@@ -6,5 +6,6 @@ export interface Student extends Row {
   namalengkap?: string;
   nis?: string;
   kelas?: string;
+  kelasId?: number;
   status?: string;
 }

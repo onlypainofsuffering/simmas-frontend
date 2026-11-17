@@ -8,6 +8,8 @@ export const endpoints = {
     guru: '/admin/guru',
     guruActive: '/admin/guru?status=AKTIF',
     guruStatus: (id: string | number) => `/admin/guru/${id}/status`,
+    kelas: '/admin/kelas',
+    kelasById: (id: string | number) => `/admin/kelas/${id}`,
     siswa: '/admin/siswa',
     siswaStatus: (id: string | number) => `/admin/siswa/${id}/status`,
     mitra: '/admin/mitra',

@@ -36,9 +36,23 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [detail, setDetail] = useState<Row | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
-  const [kelasOptions, setKelasOptions] = useState<string[]>([]);
+  const [kelasMaster, setKelasMaster] = useState<Row[]>([]);
 
   const fields = edit ? cfg.editFields || cfg.fields || [] : cfg.fields || [];
+  const useMasterKelas =
+    role === 'admin' && ['siswa', 'Penempatan Data'].includes(section);
+  const kelasOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...kelasMaster.map(item => String(item.nama ?? '')),
+          ...data.map(item => String(item.kelas ?? item.siswa?.kelas ?? '')),
+        ]),
+      )
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+    [kelasMaster, data],
+  );
 
   // Endpoint /admin/penempatan/:id memakai ID siswa (lihat AdminService.updatePenempatan),
   // sedangkan baris penempatan adalah data pengajuan yang memiliki `id` sendiri.
@@ -69,10 +83,6 @@ export default function ResourcePage({ role, section }: { role: string; section:
       const result = await api(`${cfg.path}${suffix ? `?${suffix}` : ''}`);
       const rows = rowsOf(result);
       setData(rows);
-      const kelasValues = rows.map(row => String(row.kelas ?? row.siswa?.kelas ?? '')).filter(Boolean);
-      if (kelasValues.length) {
-        setKelasOptions(prev => Array.from(new Set([...prev, ...kelasValues])).sort((a, b) => a.localeCompare(b)));
-      }
     } catch (error) {
       setErr(error instanceof Error ? error.message : 'Gagal memuat data.');
     } finally {
@@ -92,6 +102,16 @@ export default function ResourcePage({ role, section }: { role: string; section:
       .catch(error => setErr(error instanceof Error ? error.message : 'Gagal memuat DUDI bimbingan.'));
   }, [role, section]);
 
+  useEffect(() => {
+    if (!useMasterKelas && !cfg.filters?.includes('kelas')) return;
+    adminService
+      .getKelas()
+      .then(result => setKelasMaster(rowsOf(result)))
+      .catch(error =>
+        setErr(error instanceof Error ? error.message : 'Gagal memuat master kelas.'),
+      );
+  }, [useMasterKelas, cfg.filters]);
+
   function openForm(item: Row | null = null) {
     setEdit(item);
     const initial: Row = {};
@@ -99,6 +119,13 @@ export default function ResourcePage({ role, section }: { role: string; section:
       initial[field.name] =
         field.type === 'date' ? toInputDate(item?.[field.name]) : item?.[field.name] ?? (field.name === 'namalengkap' ? item?.nama : '');
     });
+    if (useMasterKelas) {
+      const matched = kelasMaster.find(
+        option =>
+          String(option.id) === String(item?.kelasId) || option.nama === item?.kelas,
+      );
+      initial.kelas = item?.kelasId ?? matched?.id ?? '';
+    }
     setForm(initial);
     setErr('');
     setNotice('');
@@ -131,7 +158,9 @@ export default function ResourcePage({ role, section }: { role: string; section:
         fields.forEach(field => {
           const value = form[field.name];
           if (value === '' || value === null || value === undefined) return;
-          if (['dudiId', 'guruPembimbingId'].includes(field.name)) {
+          if (useMasterKelas && field.name === 'kelas') {
+            body.kelasId = Number(value);
+          } else if (['dudiId', 'guruPembimbingId'].includes(field.name)) {
             body[field.name] = Number(value);
           } else if (field.name === 'kuota_peserta') {
             body[field.name] = value === true || value === 'true';
@@ -399,7 +428,30 @@ export default function ResourcePage({ role, section }: { role: string; section:
         <Modal title={`${edit ? 'Edit' : 'Tambah'} ${titleCase(section)}`} onClose={() => setModal(false)}>
           <form onSubmit={save} className="mt-5 space-y-4">
             {fields.map(field =>
-              field.name === 'dudiId' && role === 'guru' && section === 'kunjungan' ? (
+              field.name === 'kelas' && useMasterKelas ? (
+                <label key={field.name} className="block text-xs font-semibold text-slate-600">
+                  {field.label}
+                  <Select
+                    className="mt-2"
+                    required={field.required}
+                    value={form[field.name] || ''}
+                    onChange={event => setForm({ ...form, [field.name]: event.target.value })}
+                  >
+                    <option value="">Pilih kelas</option>
+                    {kelasMaster.map(option => (
+                      <option key={option.id} value={option.id}>
+                        {option.nama}
+                        {option.jurusan ? ` (${option.jurusan})` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                  {!kelasMaster.length && (
+                    <span className="mt-1 block font-normal text-slate-400">
+                      Belum ada master kelas. Tambahkan terlebih dahulu di Data Kelas.
+                    </span>
+                  )}
+                </label>
+              ) : field.name === 'dudiId' && role === 'guru' && section === 'kunjungan' ? (
                 <label key={field.name} className="block text-xs font-semibold text-slate-600">
                   Perusahaan Mitra
                   <Select className="mt-2" required value={form.dudiId || ''} onChange={event => setForm({ ...form, dudiId: event.target.value })}>

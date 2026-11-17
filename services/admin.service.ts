@@ -7,6 +7,12 @@ export const adminService = {
   getMonitoringStudents: () => api(endpoints.admin.monitoringSiswa),
   getTeachers: () => api(endpoints.admin.guru),
   getActiveTeachers: () => api(endpoints.admin.guruActive),
+  getKelas: () => api(endpoints.admin.kelas),
+  createKelas: (body: Record<string, any>) => api(endpoints.admin.kelas, json('POST', body)),
+  updateKelas: (id: string | number, body: Record<string, any>) =>
+    api(endpoints.admin.kelasById(id), json('PATCH', body)),
+  deleteKelas: (id: string | number) =>
+    api(endpoints.admin.kelasById(id), { method: 'DELETE' }),
   getCompanies: () => dudiService.getAll(),
   getApplications: () => magangService.getApplications(),
   getVisits: () => api(endpoints.admin.monitoringKunjungan),

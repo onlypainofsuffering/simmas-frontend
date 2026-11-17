@@ -22,7 +22,8 @@ Frontend Next.js 14 + TypeScript + Tailwind CSS untuk sistem manajemen magang.
 ## Catatan integrasi
 - Semua request memakai `Authorization: Bearer <token>` setelah login.
 - Bentuk response login dideteksi dari `access_token`, `accessToken`, atau `token`, serta role dari object user. Jika backend memakai nama field berbeda, sesuaikan `lib/auth/auth.service.ts`.
-- Form pendaftaran mengikuti DTO backend: guru memakai `namalengkap`, `nip`, `jurusan`; siswa memakai `nama`, `nis`, `kelas`; backend menghasilkan email dan password awal akun.
+- Form pendaftaran mengikuti DTO backend: guru memakai `namalengkap`, `nip`, `jurusan`; siswa memakai `nama`, `nis`, `kelasId`; backend menghasilkan email dan password awal akun.
+- Master data kelas dikelola di `/admin/kelas` dan dipakai sebagai pilihan kelas pada form siswa; kelas yang masih dipakai siswa tidak bisa dihapus.
 - Halaman siswa membaca `data.list_dudi_disetujui`, `data.pengajuan_magang`, `data.absen_hari_ini`, dan `data.riwayat_absen` dari response dashboard backend.
 - Guru dapat memeriksa riwayat absensi melalui tab Jurnal & Absensi; daftar DUDI untuk kunjungan diambil dari `/guru/dudi-bimbingan`.
 - Ganti password Guru dan Log Aktivitas & Audit belum memiliki endpoint pada backend yang dilampirkan; keduanya tidak mengirim request palsu.
