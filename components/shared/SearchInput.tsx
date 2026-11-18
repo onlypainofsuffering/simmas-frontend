@@ -13,7 +13,7 @@ interface SearchInputProps {
 export function SearchInput({
   value,
   onChange,
-  placeholder = 'Cari data...',
+  placeholder = 'Cari Data...',
   className = 'w-full sm:w-64',
 }: SearchInputProps) {
   return (

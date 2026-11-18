@@ -5,6 +5,8 @@ export interface Field {
   label: string;
   type?: FieldType;
   required?: boolean;
+  numeric?: boolean;
+  noLetters?: boolean;
   options?: string[];
 }
 
@@ -22,6 +24,7 @@ export interface PageConfig {
   path?: string;
   createPath?: string;
   filters?: string[];
+  clientFilters?: string[];
   fields?: Field[];
   editFields?: Field[];
   actions?: string[];

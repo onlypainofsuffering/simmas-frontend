@@ -4,14 +4,16 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { dataOf, label } from '@/lib/api/client';
 import { cellValue } from '@/lib/utils/resource';
+import { recordActivity } from '@/lib/utils/activity-log';
 import { absensiService } from '@/services/absensi.service';
 import { siswaService } from '@/services/siswa.service';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/ConfirmDialog';
 import { Feedback } from '@/components/shared/Feedback';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import { SelectField } from '@/components/ui/Select';
 import { Table } from '@/components/ui/Table';
 import type { Row } from '@/types/api';
 
@@ -25,6 +27,8 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [notice, setNotice] = useState('');
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const canCheckout = today?.statusAbsen === 'HADIR' && !today?.jamKeluar;
   const checkedIn = Boolean(today);
 
@@ -44,25 +48,45 @@ export default function AttendancePage() {
     load();
   }, [load]);
 
-  async function checkIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setErr('');
-    setNotice('');
+  async function runConfirm() {
+    if (!confirm) return;
+    const task = confirm.onConfirm;
+    setConfirming(true);
     try {
-      const body = new FormData();
-      body.append('statusAbsen', statusAbsen);
-      if (keterangan) body.append('keterangan', keterangan);
-      if (statusAbsen === 'HADIR' && foto) body.append('foto', foto);
-      const response = await absensiService.checkIn(body);
-      setToday(dataOf(response));
-      await load();
-      setNotice('Absensi masuk berhasil dikirim.');
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Gagal mengirim absensi masuk.');
+      await task();
+    } finally {
+      setConfirming(false);
+      setConfirm(null);
     }
   }
 
-  async function checkOut(event: FormEvent<HTMLFormElement>) {
+  function checkIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErr('');
+    setNotice('');
+    setConfirm({
+      title: 'Konfirmasi Absen Masuk',
+      description: `Absen masuk dengan status ${label(statusAbsen)} akan dikirim. Lanjutkan?`,
+      confirmLabel: 'Kirim Absen',
+      onConfirm: async () => {
+        try {
+          const body = new FormData();
+          body.append('statusAbsen', statusAbsen);
+          if (keterangan) body.append('keterangan', keterangan);
+          if (statusAbsen === 'HADIR' && foto) body.append('foto', foto);
+          const response = await absensiService.checkIn(body);
+          setToday(dataOf(response));
+          await load();
+          recordActivity({ action: 'Tambah', menu: 'Absensi Siswa', detail: `Absen masuk ${label(statusAbsen)}` });
+          setNotice('Absensi masuk berhasil dikirim.');
+        } catch (error) {
+          setErr(error instanceof Error ? error.message : 'Gagal mengirim absensi masuk.');
+        }
+      },
+    });
+  }
+
+  function checkOut(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErr('');
     setNotice('');
@@ -70,16 +94,24 @@ export default function AttendancePage() {
       setErr('Lakukan absen masuk berstatus HADIR terlebih dahulu.');
       return;
     }
-    try {
-      const body = new FormData();
-      if (fotoKeluar) body.append('foto', fotoKeluar);
-      const response = await absensiService.checkOut(body);
-      setToday(dataOf(response));
-      await load();
-      setNotice('Absensi pulang berhasil dikirim.');
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Gagal mengirim absensi pulang.');
-    }
+    setConfirm({
+      title: 'Konfirmasi Absen Pulang',
+      description: 'Absen pulang hari ini akan dikirim. Lanjutkan?',
+      confirmLabel: 'Kirim Absen',
+      onConfirm: async () => {
+        try {
+          const body = new FormData();
+          if (fotoKeluar) body.append('foto', fotoKeluar);
+          const response = await absensiService.checkOut(body);
+          setToday(dataOf(response));
+          await load();
+          recordActivity({ action: 'Ubah', menu: 'Absensi Siswa', detail: 'Absen pulang' });
+          setNotice('Absensi pulang berhasil dikirim.');
+        } catch (error) {
+          setErr(error instanceof Error ? error.message : 'Gagal mengirim absensi pulang.');
+        }
+      },
+    });
   }
 
   return (
@@ -117,11 +149,18 @@ export default function AttendancePage() {
             <h3 className="text-xs font-bold text-slate-700">Absen Masuk</h3>
             <label className="mt-3 block text-[11px] font-semibold">
               Status Kehadiran
-              <Select className="mt-1" value={statusAbsen} disabled={checkedIn || loading} onChange={event => setStatusAbsen(event.target.value)}>
-                <option>HADIR</option>
-                <option>IZIN</option>
-                <option>SAKIT</option>
-              </Select>
+              <SelectField
+                className="mt-1"
+                name="statusAbsen"
+                value={statusAbsen}
+                disabled={checkedIn || loading}
+                onValueChange={setStatusAbsen}
+                options={[
+                  { value: 'HADIR', label: 'HADIR' },
+                  { value: 'IZIN', label: 'IZIN' },
+                  { value: 'SAKIT', label: 'SAKIT' },
+                ]}
+              />
             </label>
             {statusAbsen !== 'HADIR' && (
               <label className="mt-3 block text-[11px] font-semibold">
@@ -223,6 +262,16 @@ export default function AttendancePage() {
           <EmptyState text="Belum ada riwayat absensi." />
         )}
       </Card>
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.title || ''}
+        description={confirm?.description || ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        loading={confirming}
+        onCancel={() => setConfirm(null)}
+        onConfirm={runConfirm}
+      />
     </div>
   );
 }

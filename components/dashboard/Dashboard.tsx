@@ -194,7 +194,7 @@ export default function Dashboard({ role }: { role: string }) {
     href?: string;
   };
   const adminCards: CardItem[] = [
-    { title: 'Total Siswa', value: students.length, detail: 'Data siswa terdaftar', tone: 'blue', href: '/admin/siswa' },
+    { title: 'Siswa', value: students.length, detail: 'Data siswa terdaftar', tone: 'blue', href: '/admin/siswa' },
     { title: 'Guru Pembimbing', value: teachers.length, detail: 'Guru terdaftar', tone: 'purple', href: '/admin/guru' },
     { title: 'Mitra DUDI', value: companies.length, detail: 'Perusahaan mitra', tone: 'green', href: '/admin/dudi' },
   ];
@@ -253,7 +253,7 @@ export default function Dashboard({ role }: { role: string }) {
           >
             <Card className="h-full p-5 transition hover:shadow-md">
               <h3 className="text-sm font-bold text-slate-800">Status Pengajuan Magang</h3>
-              <p className="mt-1 text-[11px] text-slate-400">Ringkasan permohonan yang menunggu keputusan admin.</p>
+              <p className="mt-1 text-[11px] text-slate-400">Permohonan menunggu admin.</p>
               <p className="mt-6 text-xs text-slate-500">Lihat detail pengajuan pada halaman penempatan.</p>
             </Card>
           </Link>

@@ -6,14 +6,14 @@ export const companyFields: Field[] = [
   { name: 'bidang_usaha', label: 'Bidang Usaha', required: true },
   { name: 'kuota_peserta', label: 'Kuota Peserta Tersedia', type: 'select', options: ['true', 'false'], required: true },
   { name: 'direktur', label: 'Direktur', required: true },
-  { name: 'kontak', label: 'Kontak', required: true },
+  { name: 'kontak', label: 'Kontak', required: true, numeric: true },
 ];
 
 export const resourceConfigs: Record<string, PageConfig> = {
   'admin:dashboard': { kind: 'dashboard' },
   'admin:monitoring-global': { kind: 'monitoring' },
-  'admin:monitoring siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'] },
-  'admin:Monitoring Kunjungan': { path: '/admin/monitoring/kunjungan' },
+  'admin:monitoring siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'], clientFilters: ['status'] },
+  'admin:Monitoring Kunjungan': { path: '/admin/monitoring/kunjungan', clientFilters: ['status'] },
   'admin:pengajuan-magang': { path: '/admin/pengajuan-magang', actions: ['approve', 'reject'] },
   'admin:kelas': {
     path: '/admin/kelas',
@@ -31,12 +31,12 @@ export const resourceConfigs: Record<string, PageConfig> = {
     filters: ['kelas', 'dudiId', 'status'],
     fields: [
       { name: 'nama', label: 'Nama Lengkap', required: true },
-      { name: 'nis', label: 'NIS', required: true },
+      { name: 'nis', label: 'NIS', required: true, noLetters: true },
       { name: 'kelas', label: 'Kelas', required: true },
     ],
     editFields: [
       { name: 'namalengkap', label: 'Nama Lengkap' },
-      { name: 'nis', label: 'NIS' },
+      { name: 'nis', label: 'NIS', noLetters: true },
       { name: 'kelas', label: 'Kelas' },
     ],
     actions: ['edit', 'delete', 'status'],
@@ -47,13 +47,13 @@ export const resourceConfigs: Record<string, PageConfig> = {
     filters: ['jurusan', 'status'],
     fields: [
       { name: 'namalengkap', label: 'Nama Lengkap', required: true },
-      { name: 'nip', label: 'NIP', required: true },
+      { name: 'nip', label: 'NIP', required: true, numeric: true },
       { name: 'alamat', label: 'Alamat', required: true},
       { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'], required: true },
     ],
     editFields: [
       { name: 'namalengkap', label: 'Nama Lengkap' },
-      { name: 'nip', label: 'NIP' },
+      { name: 'nip', label: 'NIP', numeric: true },
       { name: 'alamat', label: 'Alamat'},
       { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'] },
     ],
@@ -69,7 +69,7 @@ export const resourceConfigs: Record<string, PageConfig> = {
   'admin:penempatan': { kind: 'placement' },
   'admin:Penempatan Data': {
     path: '/admin/penempatan',
-    filters: ['kelas', 'dudiId', 'status'],
+    filters: ['kelas', 'dudiId', 'posisi', 'status'],
     fields: [
       { name: 'dudiId', label: 'ID Perusahaan', type: 'number', required: true },
       { name: 'guruPembimbingId', label: 'ID Guru Pembimbing', type: 'number', required: true },
@@ -123,12 +123,20 @@ export const statusChoices: Record<string, string[]> = {
   mitra: ['TERVERIFIKASI', 'MENUNGGU_VALIDASI'],
   penempatan: ['SEDANG_MAGANG', 'LULUS'],
   'Penempatan Data': ['SEDANG_MAGANG', 'LULUS'],
+  'monitoring siswa': [
+    'BELUM_MAGANG',
+    'SEDANG_MAGANG',
+    'LULUS',
+    'PERLU_PERHATIAN',
+    'BERMASALAH',
+  ],
+  'Monitoring Kunjungan': ['Akan Datang', 'Terlaksana'],
 };
 
 export const preferredColumns: Record<string, string[]> = {
   'admin:kelas': ['nama', 'jurusan'],
   'admin:monitoring siswa': ['nama', 'kelas', 'dudi', 'pembimbing', 'kehadiran', 'jumlah_jurnal', 'status'],
-  'admin:Monitoring Kunjungan': ['tanggal', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
+  'admin:Monitoring Kunjungan': ['tanggal', 'status', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
   'admin:siswa': ['nama', 'nis', 'kelas', 'status'],
   'admin:guru': ['namalengkap', 'nip', 'alamat' , 'jurusan', 'status'],
   'admin:mitra': ['nama_perusahaan', 'bidang_usaha', 'direktur' , 'alamat', 'kontak', 'status'],

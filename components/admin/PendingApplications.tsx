@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { label, rowsOf } from '@/lib/api/client';
 import { idOf } from '@/lib/utils/resource';
+import { recordActivity } from '@/lib/utils/activity-log';
 import { adminService } from '@/services/admin.service';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/ConfirmDialog';
 import { Feedback } from '@/components/shared/Feedback';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+import { SelectField } from '@/components/ui/Select';
 import { Card } from '@/components/ui/Card';
 import type { Row } from '@/types/api';
 
@@ -19,6 +21,8 @@ export default function PendingApplications() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [notice, setNotice] = useState('');
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirming, setConfirming] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,7 +45,19 @@ export default function PendingApplications() {
     load();
   }, [load]);
 
-  async function decide(application: Row, status: 'DISETUJUI' | 'DITOLAK') {
+  async function runConfirm() {
+    if (!confirm) return;
+    const task = confirm.onConfirm;
+    setConfirming(true);
+    try {
+      await task();
+    } finally {
+      setConfirming(false);
+      setConfirm(null);
+    }
+  }
+
+  function decide(application: Row, status: 'DISETUJUI' | 'DITOLAK') {
     const id = idOf(application);
     if (!id) {
       setErr('ID pengajuan tidak ditemukan.');
@@ -60,17 +76,34 @@ export default function PendingApplications() {
 
     setErr('');
     setNotice('');
-    try {
-      const response = await adminService.decideApplication(id, body);
-      setNotice(response?.message || `Pengajuan berhasil ${status === 'DISETUJUI' ? 'disetujui' : 'ditolak'}.`);
-      await load();
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Gagal memproses pengajuan.');
-    }
+    const approved = status === 'DISETUJUI';
+    setConfirm({
+      title: approved ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan',
+      description: approved
+        ? 'Pengajuan ini akan disetujui dan guru pembimbing terpilih akan ditetapkan. Lanjutkan?'
+        : 'Pengajuan ini akan ditolak. Lanjutkan?',
+      confirmLabel: approved ? 'Setujui' : 'Tolak',
+      tone: approved ? 'primary' : 'danger',
+      onConfirm: async () => {
+        try {
+          const response = await adminService.decideApplication(id, body);
+          recordActivity({
+            action: approved ? 'Setujui' : 'Tolak',
+            menu: 'Pengajuan Magang',
+            detail: `${label(application.siswa?.nama)} - ${status}`,
+          });
+          setNotice(response?.message || `Pengajuan berhasil ${approved ? 'disetujui' : 'ditolak'}.`);
+          await load();
+        } catch (error) {
+          setErr(error instanceof Error ? error.message : 'Gagal memproses pengajuan.');
+        }
+      },
+    });
   }
 
   return (
-    <Card className="overflow-hidden">
+    <>
+      <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100 bg-amber-50/70 p-4">
         <div>
           <h2 className="text-sm font-bold text-slate-800">Pengajuan Magang Menunggu Validasi</h2>
@@ -102,17 +135,15 @@ export default function PendingApplications() {
                     Diajukan {label(application.createdAt ? new Date(application.createdAt).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : '-')}
                   </div>
                 </div>
-                <Select
+                <SelectField
                   value={selectedTeachers[id] || ''}
-                  onChange={event => setSelectedTeachers({ ...selectedTeachers, [id]: event.target.value })}
-                >
-                  <option value="">Pilih guru pembimbing aktif</option>
-                  {teachers.map(teacher => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.namalengkap} · {teacher.jurusan}
-                    </option>
-                  ))}
-                </Select>
+                  onValueChange={value => setSelectedTeachers({ ...selectedTeachers, [id]: value })}
+                  placeholder="Pilih Guru Pembimbing Aktif"
+                  options={teachers.map(teacher => ({
+                    value: teacher.id,
+                    label: `${label(teacher.namalengkap)} · ${label(teacher.jurusan)}`,
+                  }))}
+                />
                 <div className="flex justify-end gap-2">
                   <Button variant="danger" onClick={() => decide(application, 'DITOLAK')}>
                     <X size={14} /> Tolak
@@ -128,6 +159,17 @@ export default function PendingApplications() {
       ) : (
         <EmptyState text="Tidak ada pengajuan yang menunggu keputusan." />
       )}
-    </Card>
+      </Card>
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.title || ''}
+        description={confirm?.description || ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        loading={confirming}
+        onCancel={() => setConfirm(null)}
+        onConfirm={runConfirm}
+      />
+    </>
   );
 }

@@ -50,7 +50,7 @@ export default function GuruAttendancePanel() {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard title="Total Bimbingan" value={students.length} detail="Siswa dibimbing" />
+        <StatCard title="Bimbingan" value={students.length} detail="Siswa dibimbing" />
         <StatCard
           title="Sedang Aktif"
           value={students.filter(item => item.siswa?.status === 'SEDANG_MAGANG').length}

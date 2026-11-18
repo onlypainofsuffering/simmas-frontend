@@ -4,15 +4,17 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Plus, Save } from 'lucide-react';
 import { dataOf, label } from '@/lib/api/client';
 import { findRows } from '@/lib/utils/resource';
+import { recordActivity } from '@/lib/utils/activity-log';
 import { companyFields } from '@/constants/resource-config';
 import { siswaService } from '@/services/siswa.service';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/ConfirmDialog';
 import { Feedback } from '@/components/shared/Feedback';
 import { FormField } from '@/components/forms/FormField';
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+import { SelectField } from '@/components/ui/Select';
 import type { Row } from '@/types/api';
 
 export default function StudentApplication() {
@@ -25,6 +27,8 @@ export default function StudentApplication() {
   const [companyError, setCompanyError] = useState('');
   const [companyNotice, setCompanyNotice] = useState('');
   const [loading, setLoading] = useState(true);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const dashboard = dataOf(info);
   const companies = findRows(dashboard, ['list_dudi_disetujui']);
   const applications = findRows(dashboard, ['pengajuan_magang']);
@@ -38,43 +42,75 @@ export default function StudentApplication() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setErr('');
-    setNotice('');
+  async function runConfirm() {
+    if (!confirm) return;
+    const task = confirm.onConfirm;
+    setConfirming(true);
     try {
-      const id = Number(form.dudiId);
-      if (!Number.isInteger(id) || id < 1) throw new Error('Pilih perusahaan mitra yang valid.');
-      const response = await siswaService.submitApplication({ dudiId: id, posisi: form.posisi });
-      setNotice(response?.message || 'Pengajuan magang berhasil dikirim.');
-      setForm({ dudiId: '', posisi: '' });
-      try {
-        setInfo(await siswaService.getDashboard());
-      } catch (error) {
-        setErr(
-          `Pengajuan berhasil dikirim, tetapi status terbaru gagal dimuat: ${
-            error instanceof Error ? error.message : 'kesalahan tidak diketahui'
-          }`,
-        );
-      }
-    } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Gagal mengirim pengajuan magang.');
+      await task();
+    } finally {
+      setConfirming(false);
+      setConfirm(null);
     }
   }
 
-  async function submitCompany(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErr('');
+    setNotice('');
+    const id = Number(form.dudiId);
+    if (!Number.isInteger(id) || id < 1) {
+      setErr('Pilih perusahaan mitra yang valid.');
+      return;
+    }
+    const posisi = form.posisi;
+    setConfirm({
+      title: 'Konfirmasi Pengajuan Magang',
+      description: `Pengajuan magang pada posisi ${posisi} akan dikirim. Lanjutkan?`,
+      confirmLabel: 'Kirim Pengajuan',
+      onConfirm: async () => {
+        try {
+          const response = await siswaService.submitApplication({ dudiId: id, posisi });
+          recordActivity({ action: 'Tambah', menu: 'Pengajuan Magang', detail: `Pengajuan ${posisi}` });
+          setNotice(response?.message || 'Pengajuan magang berhasil dikirim.');
+          setForm({ dudiId: '', posisi: '' });
+          try {
+            setInfo(await siswaService.getDashboard());
+          } catch (error) {
+            setErr(
+              `Pengajuan berhasil dikirim, tetapi status terbaru gagal dimuat: ${
+                error instanceof Error ? error.message : 'kesalahan tidak diketahui'
+              }`,
+            );
+          }
+        } catch (error) {
+          setErr(error instanceof Error ? error.message : 'Gagal mengirim pengajuan magang.');
+        }
+      },
+    });
+  }
+
+  function submitCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCompanyError('');
     setCompanyNotice('');
     const body = { ...companyForm, kuota_peserta: companyForm.kuota_peserta === true || companyForm.kuota_peserta === 'true' };
-    try {
-      const response = await siswaService.proposeCompany(body);
-      setCompanyNotice(response?.message || 'Usulan perusahaan berhasil dikirim untuk validasi admin.');
-      setCompanyForm({});
-      setCompanyModal(false);
-    } catch (error) {
-      setCompanyError(error instanceof Error ? error.message : 'Gagal mengirim usulan perusahaan.');
-    }
+    setConfirm({
+      title: 'Konfirmasi Usulan Perusahaan',
+      description: 'Usulan perusahaan akan dikirim untuk validasi admin. Lanjutkan?',
+      confirmLabel: 'Kirim Usulan',
+      onConfirm: async () => {
+        try {
+          const response = await siswaService.proposeCompany(body);
+          recordActivity({ action: 'Tambah', menu: 'Perusahaan', detail: String(companyForm.nama_perusahaan || '-') });
+          setCompanyNotice(response?.message || 'Usulan perusahaan berhasil dikirim untuk validasi admin.');
+          setCompanyForm({});
+          setCompanyModal(false);
+        } catch (error) {
+          setCompanyError(error instanceof Error ? error.message : 'Gagal mengirim usulan perusahaan.');
+        }
+      },
+    });
   }
 
   return (
@@ -95,18 +131,21 @@ export default function StudentApplication() {
           <label className="text-xs font-semibold text-slate-600">
             Perusahaan Mitra
             {companies.length ? (
-              <Select className="mt-2" required value={form.dudiId} onChange={event => setForm({ ...form, dudiId: event.target.value })}>
-                <option value="">Pilih perusahaan</option>
-                {companies.map((company, index) => {
+              <SelectField
+                className="mt-2"
+                required
+                name="dudiId"
+                value={form.dudiId}
+                onValueChange={value => setForm({ ...form, dudiId: value })}
+                placeholder="Pilih Perusahaan"
+                options={companies.map((company, index) => {
                   const companyId = company.id ?? company.dudiId;
-                  return (
-                    <option key={companyId ?? index} value={companyId}>
-                      {label(company.nama_perusahaan ?? company.nama ?? company.name)}
-                      {company.bidang_usaha ? ` · ${label(company.bidang_usaha)}` : ''}
-                    </option>
-                  );
+                  return {
+                    value: companyId,
+                    label: `${label(company.nama_perusahaan ?? company.nama ?? company.name)}${company.bidang_usaha ? ` · ${label(company.bidang_usaha)}` : ''}`,
+                  };
                 })}
-              </Select>
+              />
             ) : (
               <div className="input mt-2 text-slate-400">
                 {loading ? 'Memuat perusahaan...' : 'Belum ada perusahaan terverifikasi.'}
@@ -139,7 +178,7 @@ export default function StudentApplication() {
       </Card>
       {companyError && <Feedback err={companyError} notice="" />}
       {companyNotice && <Feedback err="" notice={companyNotice} />}
-      {companyModal && (
+      {companyModal && !confirm && (
         <Modal title="Usulkan Perusahaan Mitra" onClose={() => setCompanyModal(false)}>
           <form onSubmit={submitCompany} className="space-y-4">
             {companyFields.map(field => (
@@ -157,6 +196,16 @@ export default function StudentApplication() {
           </form>
         </Modal>
       )}
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.title || ''}
+        description={confirm?.description || ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        loading={confirming}
+        onCancel={() => setConfirm(null)}
+        onConfirm={runConfirm}
+      />
     </div>
   );
 }

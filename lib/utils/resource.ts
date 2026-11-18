@@ -2,7 +2,13 @@ import type { Row } from '@/types/api';
 import { formatDate } from './format-date';
 
 export function titleCase(value: string) {
-  return value.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+  return String(value)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/[_-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
 
 export function idOf(item: Row) {

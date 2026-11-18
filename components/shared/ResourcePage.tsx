@@ -6,9 +6,12 @@ import { api, dataOf, json, label, rowsOf } from '@/lib/api/client';
 import { resourceConfigs, preferredColumns, statusChoices } from '@/constants/resource-config';
 import { cellValue, idOf, titleCase } from '@/lib/utils/resource';
 import { toInputDate } from '@/lib/utils/format-date';
+import { recordActivity } from '@/lib/utils/activity-log';
+import { usePagination } from '@/hooks/usePagination';
 import { adminService } from '@/services/admin.service';
 import { guruService } from '@/services/guru.service';
 import { FormField } from '@/components/forms/FormField';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { Feedback } from '@/components/shared/Feedback';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchInput } from '@/components/shared/SearchInput';
@@ -18,12 +21,56 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Loading } from '@/components/ui/Loading';
 import Modal from '@/components/ui/Modal';
-import { Select } from '@/components/ui/Select';
+import { Pagination } from '@/components/ui/Pagination';
+import { SelectField } from '@/components/ui/Select';
 import { Table } from '@/components/ui/Table';
 import type { Row } from '@/types/api';
+import type { Field } from '@/types/resource';
+
+const pageDescriptions: Record<string, string> = {
+  'monitoring siswa': 'Monitoring Siswa',
+  'Monitoring Kunjungan': 'Monitoring Kunjungan',
+  mitra: 'Kelola Dudi',
+  'Penempatan Data': 'Kelola Penempatan Data',
+};
+
+function visitStatus(item: Row) {
+  const raw = item.tanggal ?? item.tanggalKunjungan;
+  const parts = typeof raw === 'string' ? raw.slice(0, 10).split('-').map(Number) : [];
+  if (parts.length !== 3 || parts.some(Number.isNaN)) return '-';
+  const visit = new Date(parts[0], parts[1] - 1, parts[2]);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return visit >= today ? 'Akan Datang' : 'Terlaksana';
+}
+
+type ConfirmState = {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: 'primary' | 'danger';
+  onConfirm: () => void | Promise<void>;
+};
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function identityOf(row?: Row | null) {
+  if (!row) return '-';
+  return String(row.namalengkap || row.nama || row.nama_perusahaan || row.nis || row.id || '-');
+}
+
+function filterLabel(key: string) {
+  return key === 'dudiId' ? 'Dudi' : titleCase(key);
+}
 
 export default function ResourcePage({ role, section }: { role: string; section: string }) {
   const cfg = resourceConfigs[`${role}:${section}`] || {};
+  const filterKeys = useMemo(
+    () => Array.from(new Set([...(cfg.filters || []), ...(cfg.clientFilters || [])])),
+    [cfg.filters, cfg.clientFilters],
+  );
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
@@ -33,14 +80,28 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [edit, setEdit] = useState<Row | null>(null);
   const [form, setForm] = useState<Row>({});
   const [query, setQuery] = useState('');
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
   const [kelasMaster, setKelasMaster] = useState<Row[]>([]);
 
-  const fields = edit ? cfg.editFields || cfg.fields || [] : cfg.fields || [];
+  const resolveFields = useCallback(
+    (isEdit: boolean): Field[] => {
+      const base = isEdit ? cfg.editFields || cfg.fields || [] : cfg.fields || [];
+      if (!isEdit || !cfg.actions?.includes('status') || base.some(field => field.name === 'status')) return base;
+      return [
+        ...base,
+        { name: 'status', label: 'Status', type: 'select', options: statusChoices[section] || [] },
+      ];
+    },
+    [cfg.actions, cfg.editFields, cfg.fields, section],
+  );
+  const fields = useMemo(() => resolveFields(Boolean(edit)), [resolveFields, edit]);
   const useMasterKelas =
     role === 'admin' && ['siswa', 'Penempatan Data'].includes(section);
+  const isKunjunganMonitoring = role === 'admin' && section === 'Monitoring Kunjungan';
   const kelasOptions = useMemo(
     () =>
       Array.from(
@@ -70,6 +131,16 @@ export default function ResourcePage({ role, section }: { role: string; section:
     return [...preferred.filter(key => visible.includes(key)), ...visible.filter(key => !preferred.includes(key))].slice(0, 7);
   }, [data, role, section]);
 
+  function activityMenu() {
+    if (section === 'mitra') return 'Data Dudi';
+    if (section === 'Penempatan Data') return 'Penempatan Magang';
+    return `Data ${titleCase(section)}`;
+  }
+
+  function logChange(action: string, detail: string) {
+    recordActivity({ action, menu: activityMenu(), detail });
+  }
+
   const load = useCallback(async () => {
     if (!cfg.path) return;
     setLoading(true);
@@ -77,18 +148,22 @@ export default function ResourcePage({ role, section }: { role: string; section:
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.set(key, value);
+        if (value && !cfg.clientFilters?.includes(key)) params.set(key, value);
       });
       const suffix = params.toString();
       const result = await api(`${cfg.path}${suffix ? `?${suffix}` : ''}`);
       const rows = rowsOf(result);
-      setData(rows);
+      setData(
+        isKunjunganMonitoring
+          ? rows.map(item => ({ ...item, status: visitStatus(item) }))
+          : rows,
+      );
     } catch (error) {
       setErr(error instanceof Error ? error.message : 'Gagal memuat data.');
     } finally {
       setLoading(false);
     }
-  }, [cfg.path, filters]);
+  }, [cfg.path, cfg.clientFilters, filters, isKunjunganMonitoring]);
 
   useEffect(() => {
     load();
@@ -115,7 +190,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
   function openForm(item: Row | null = null) {
     setEdit(item);
     const initial: Row = {};
-    (item ? cfg.editFields || cfg.fields || [] : cfg.fields || []).forEach(field => {
+    resolveFields(Boolean(item)).forEach(field => {
       initial[field.name] =
         field.type === 'date' ? toInputDate(item?.[field.name]) : item?.[field.name] ?? (field.name === 'namalengkap' ? item?.nama : '');
     });
@@ -132,8 +207,39 @@ export default function ResourcePage({ role, section }: { role: string; section:
     setModal(true);
   }
 
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function askConfirm(state: ConfirmState) {
+    setErr('');
+    setNotice('');
+    setConfirm(state);
+  }
+
+  async function confirmAndRun() {
+    if (!confirm) return;
+    const task = confirm.onConfirm;
+    setConfirming(true);
+    try {
+      await task();
+    } finally {
+      setConfirming(false);
+      setConfirm(null);
+    }
+  }
+
+  async function updateStatusIfNeeded() {
+    if (!edit || !cfg.actions?.includes('status')) return;
+    const id = rowId(edit);
+    const next = String(form.status ?? '');
+    if (!id || !next || next === String(edit.status ?? '')) return;
+    if (role === 'admin' && section === 'guru') {
+      await adminService.updateTeacherStatus(id, next);
+    } else if (role === 'admin' && section === 'siswa') {
+      await adminService.updateStudentStatus(id, next);
+    } else {
+      await adminService.updatePlacementStatus(id, next);
+    }
+  }
+
+  async function performSave() {
     const path = edit ? `${cfg.path}/${rowId(edit)}` : cfg.createPath;
     if (!path || (edit && !rowId(edit))) {
       setErr('ID atau endpoint data tidak ditemukan.');
@@ -141,10 +247,13 @@ export default function ResourcePage({ role, section }: { role: string; section:
     }
     setErr('');
     try {
+      const detail = identityOf(edit) !== '-' ? identityOf(edit) : String(form.nama || form.namalengkap || form.nama_perusahaan || form.nis || '-');
+      const handlesStatusSeparately = Boolean(edit && cfg.actions?.includes('status'));
       const isMultipart = fields.some(field => field.type === 'file');
       if (isMultipart) {
         const body = new FormData();
         fields.forEach(field => {
+          if (handlesStatusSeparately && field.name === 'status') return;
           const value = form[field.name];
           if (field.type === 'file') {
             if (value) body.append(field.name, value);
@@ -153,9 +262,12 @@ export default function ResourcePage({ role, section }: { role: string; section:
           }
         });
         await api(path, { method: edit ? 'PATCH' : 'POST', body });
+        await updateStatusIfNeeded();
+        logChange(edit ? 'Ubah' : 'Tambah', detail);
       } else {
         const body: Row = {};
         fields.forEach(field => {
+          if (handlesStatusSeparately && field.name === 'status') return;
           const value = form[field.name];
           if (value === '' || value === null || value === undefined) return;
           if (useMasterKelas && field.name === 'kelas') {
@@ -169,6 +281,8 @@ export default function ResourcePage({ role, section }: { role: string; section:
           }
         });
         const response = await api(path, json(edit ? 'PATCH' : 'POST', body));
+        await updateStatusIfNeeded();
+        logChange(edit ? 'Ubah' : 'Tambah', detail);
         const userEmail = response?.data?.email;
         const message = response?.message || 'Data berhasil disimpan.';
         setModal(false);
@@ -180,7 +294,34 @@ export default function ResourcePage({ role, section }: { role: string; section:
       setNotice('Data berhasil disimpan.');
       await load();
     } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Gagal menyimpan data.');
+      setErr(errorMessage(error, 'Gagal menyimpan data.'));
+    }
+  }
+
+  function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const path = edit ? `${cfg.path}/${rowId(edit)}` : cfg.createPath;
+    if (!path || (edit && !rowId(edit))) {
+      setErr('ID atau endpoint data tidak ditemukan.');
+      return;
+    }
+    askConfirm({
+      title: edit ? 'Konfirmasi Perubahan Data' : 'Konfirmasi Simpan Data',
+      message: edit
+        ? `Perubahan data ${titleCase(section)} akan disimpan. Lanjutkan?`
+        : `Data ${titleCase(section)} baru akan disimpan. Lanjutkan?`,
+      confirmLabel: 'Simpan',
+      onConfirm: performSave,
+    });
+  }
+
+  async function runAction(task: () => Promise<unknown>) {
+    try {
+      await task();
+      setNotice('Aksi berhasil diproses.');
+      await load();
+    } catch (error) {
+      setErr(errorMessage(error, 'Aksi gagal diproses.'));
     }
   }
 
@@ -192,36 +333,74 @@ export default function ResourcePage({ role, section }: { role: string; section:
     }
     setErr('');
     setNotice('');
+
+    if (actionName === 'detail' && role === 'guru' && section === 'siswa') {
+      setDetailLoading(true);
+      try {
+        setDetail(dataOf(await guruService.getStudentDetail(id)));
+      } finally {
+        setDetailLoading(false);
+      }
+      return;
+    }
+    if (actionName === 'detail') {
+      setDetail(item);
+      return;
+    }
+
     try {
       if (actionName === 'delete') {
-        if (!window.confirm('Yakin ingin menghapus data ini?')) return;
-        await api(`${cfg.path}/${id}`, { method: 'DELETE' });
-      } else if (actionName === 'approve' || actionName === 'reject') {
-        const body: Row = { status: actionName === 'approve' ? 'DISETUJUI' : 'DITOLAK' };
-        if (actionName === 'approve') {
+        askConfirm({
+          title: 'Konfirmasi Hapus Data',
+          message: `Data ${titleCase(section)} akan dihapus secara permanen. Lanjutkan?`,
+          confirmLabel: 'Hapus',
+          tone: 'danger',
+          onConfirm: () => runAction(async () => {
+            await api(`${cfg.path}/${id}`, { method: 'DELETE' });
+            logChange('Hapus', identityOf(item));
+          }),
+        });
+        return;
+      }
+
+      if (actionName === 'approve' || actionName === 'reject') {
+        const approve = actionName === 'approve';
+        const body: Row = { status: approve ? 'DISETUJUI' : 'DITOLAK' };
+        if (approve) {
           const teacherId = window.prompt('Masukkan ID guru pembimbing aktif (wajib):');
           if (teacherId === null) return;
           if (!/^\d+$/.test(teacherId.trim())) throw new Error('ID guru pembimbing aktif wajib berupa angka.');
           body.guruPembimbingId = Number(teacherId);
         }
-        await adminService.decideApplication(id, body);
-      } else if (actionName === 'verify') {
-        await adminService.verifyCompany(id);
-      } else if (actionName === 'status') {
-        const choices = statusChoices[section] || [];
-        const value = window.prompt(`Status baru (${choices.join(' / ')}):`, choices[0]);
-        if (value === null) return;
-        if (!choices.includes(value.trim())) {
-          throw new Error(`Status harus salah satu dari: ${choices.join(', ')}.`);
-        }
-        if (role === 'admin' && section === 'guru') {
-          await adminService.updateTeacherStatus(id, value.trim());
-        } else if (role === 'admin' && section === 'siswa') {
-          await adminService.updateStudentStatus(id, value.trim());
-        } else {
-          await adminService.updatePlacementStatus(id, value.trim());
-        }
-      } else if (actionName === 'grade') {
+        askConfirm({
+          title: approve ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan',
+          message: approve
+            ? `Pengajuan ${titleCase(section)} akan disetujui. Lanjutkan?`
+            : `Pengajuan ${titleCase(section)} akan ditolak. Lanjutkan?`,
+          confirmLabel: approve ? 'Setujui' : 'Tolak',
+          tone: approve ? 'primary' : 'danger',
+          onConfirm: () => runAction(async () => {
+            await adminService.decideApplication(id, body);
+            logChange(approve ? 'Setujui' : 'Tolak', identityOf(item));
+          }),
+        });
+        return;
+      }
+
+      if (actionName === 'verify') {
+        askConfirm({
+          title: 'Konfirmasi Verifikasi',
+          message: 'Mitra DUDI akan diverifikasi. Lanjutkan?',
+          confirmLabel: 'Verifikasi',
+          onConfirm: () => runAction(async () => {
+            await adminService.verifyCompany(id);
+            logChange('Verifikasi', identityOf(item));
+          }),
+        });
+        return;
+      }
+
+      if (actionName === 'grade') {
         const rawScore = window.prompt('Masukkan nilai PKL (0–100):');
         if (rawScore === null) return;
         if (!rawScore.trim()) throw new Error('Nilai PKL wajib diisi.');
@@ -230,44 +409,63 @@ export default function ResourcePage({ role, section }: { role: string; section:
           throw new Error('Nilai PKL harus berupa angka dari 0 sampai 100.');
         }
         const catatan = window.prompt('Catatan penilaian (opsional):') || '';
-        await guruService.gradeStudent(id, { nilai, catatan });
-      } else if (actionName === 'journal') {
+        askConfirm({
+          title: 'Konfirmasi Penilaian',
+          message: `Nilai PKL ${nilai} akan disimpan. Lanjutkan?`,
+          confirmLabel: 'Simpan',
+          onConfirm: () => runAction(async () => {
+            await guruService.gradeStudent(id, { nilai, catatan });
+            logChange('Nilai', `${identityOf(item)} - ${nilai}`);
+          }),
+        });
+        return;
+      }
+
+      if (actionName === 'journal') {
         const value = window.prompt('Keputusan jurnal (REVISI atau DISETUJUI_GURU):');
         if (value === null) return;
-        if (!['REVISI', 'DISETUJUI_GURU'].includes(value.trim())) {
+        const status = value.trim();
+        if (!['REVISI', 'DISETUJUI_GURU'].includes(status)) {
           throw new Error('Keputusan harus REVISI atau DISETUJUI_GURU.');
         }
         const catatanGuru = window.prompt('Catatan guru (opsional):') || '';
-        await guruService.decideJournal(id, { status: value.trim(), catatanGuru });
-      } else if (actionName === 'detail' && role === 'guru' && section === 'siswa') {
-        setDetailLoading(true);
-        try {
-          setDetail(dataOf(await guruService.getStudentDetail(id)));
-        } finally {
-          setDetailLoading(false);
-        }
-        return;
-      } else if (actionName === 'detail') {
-        setDetail(item);
-        return;
+        askConfirm({
+          title: 'Konfirmasi Keputusan Jurnal',
+          message: `Keputusan ${status} akan disimpan. Lanjutkan?`,
+          confirmLabel: 'Simpan',
+          onConfirm: () => runAction(async () => {
+            await guruService.decideJournal(id, { status, catatanGuru });
+            logChange('Ubah', `${identityOf(item)} - ${status}`);
+          }),
+        });
       }
-      setNotice('Aksi berhasil diproses.');
-      await load();
     } catch (error) {
-      setErr(error instanceof Error ? error.message : 'Aksi gagal diproses.');
+      setErr(errorMessage(error, 'Aksi gagal diproses.'));
     }
   }
 
-  const filtered = data.filter(item => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
-  const activeCount = data.filter(item =>
+  const clientFiltered = data.filter(item =>
+    (cfg.clientFilters || []).every(key => {
+      const value = filters[key];
+      return !value || String(cellValue(item, key) ?? '') === value;
+    }),
+  );
+  const filtered = clientFiltered.filter(item => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  const { page, setPage, totalPages, pageItems: paginated } = usePagination(filtered, 5);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, query, setPage]);
+
+  const activeCount = clientFiltered.filter(item =>
     ['AKTIF', 'SEDANG_MAGANG', 'TERVERIFIKASI', 'DISETUJUI'].includes(String(item.status || '').toUpperCase()),
   ).length;
-  const pendingCount = data.filter(item => /MENUNGGU|DITINJAU|VALIDASI/i.test(String(item.status || ''))).length;
+  const pendingCount = clientFiltered.filter(item => /MENUNGGU|DITINJAU|VALIDASI/i.test(String(item.status || ''))).length;
 
   return (
     <div className="space-y-5">
       <PageHeader
-        description={<>Kelola dan pantau data {section.replaceAll('-', ' ')}.</>}
+        description={pageDescriptions[section] || `Kelola ${titleCase(section)}`}
       
       >
         {cfg.createPath && (
@@ -279,8 +477,8 @@ export default function ResourcePage({ role, section }: { role: string; section:
 
       {cfg.path && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard title="Total Data" value={data.length} detail="Data tersedia" />
-          <StatCard title="Status Aktif" value={activeCount} detail="Data aktif / berjalan" tone="green" />
+          <StatCard title="Data" value={data.length} detail="Data tersedia" />
+          <StatCard title="Aktif" value={activeCount} detail="Data aktif / berjalan" tone="green" />
           <StatCard title="Perlu Perhatian" value={pendingCount} detail="Menunggu tindak lanjut" tone="amber" />
           <StatCard
             title="Hasil Ditampilkan"
@@ -291,47 +489,51 @@ export default function ResourcePage({ role, section }: { role: string; section:
         </div>
       )}
 
-      {cfg.filters?.length ? (
-        <div className="card flex flex-wrap items-end gap-3 p-4">
-          <div className="flex items-center gap-2 pb-2 text-xs font-semibold text-slate-600">
-            <Filter size={15} /> Filter
-          </div>
-          {cfg.filters.map(key => (
-            <label key={key} className="w-full text-[11px] font-semibold text-slate-500 sm:w-44 sm:flex-none">
-              {titleCase(key)}
-              {key === 'kelas' && kelasOptions.length ? (
-                <Select className="mt-1" value={filters[key] || ''} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>
-                  <option value="">Semua</option>
-                  {kelasOptions.map(value => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </Select>
-              ) : key === 'status' || key === 'jurusan' ? (
-                <Select className="mt-1" value={filters[key] || ''} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>
-                  <option value="">Semua</option>
-                  {(key === 'jurusan' ? ['RPL', 'TKJ', 'MM'] : statusChoices[section] || ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS']).map(value => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </Select>
-              ) : (
-                <Input
-                  className="mt-1"
-                  placeholder={`Cari ${titleCase(key)}`}
-                  value={filters[key] || ''}
-                  onChange={event => setFilters({ ...filters, [key]: event.target.value })}
-                />
-              )}
-            </label>
-          ))}
-        </div>
-      ) : null}
-
       <div className="card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <h2 className="text-sm font-bold text-slate-800">Daftar {titleCase(section)}</h2>
           </div>
-          <SearchInput value={query} onChange={setQuery} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            {filterKeys.length ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="hidden h-[42px] items-center gap-2 px-1 text-xs font-semibold text-slate-500 sm:inline-flex">
+                  <Filter size={15} /> Filter
+                </span>
+                {filterKeys.map(key => (
+                  <div key={key} className="w-full sm:w-40 sm:flex-none">
+                    {key === 'kelas' && kelasOptions.length ? (
+                      <SelectField
+                        className="h-[42px]"
+                        value={filters[key] || ''}
+                        onValueChange={value => setFilters({ ...filters, [key]: value })}
+                        placeholder={filterLabel(key)}
+                        emptyLabel={`Semua ${filterLabel(key)}`}
+                        options={kelasOptions.map(value => ({ value, label: value }))}
+                      />
+                    ) : key === 'status' || key === 'jurusan' ? (
+                      <SelectField
+                        className="h-[42px]"
+                        value={filters[key] || ''}
+                        onValueChange={value => setFilters({ ...filters, [key]: value })}
+                        placeholder={filterLabel(key)}
+                        emptyLabel={`Semua ${filterLabel(key)}`}
+                        options={(key === 'jurusan' ? ['RPL', 'TKJ', 'MM'] : statusChoices[section] || ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS']).map(value => ({ value, label: value }))}
+                      />
+                    ) : (
+                      <Input
+                        className="h-[42px]"
+                        placeholder={filterLabel(key)}
+                        value={filters[key] || ''}
+                        onChange={event => setFilters({ ...filters, [key]: event.target.value })}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <SearchInput value={query} onChange={setQuery} />
+          </div>
         </div>
         <Feedback err={err} notice={notice} />
         {loading ? (
@@ -358,7 +560,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filtered.map((item, index) => (
+                {paginated.map((item, index) => (
                   <tr key={rowId(item) || index} className="hover:bg-slate-50/70">
                     {cols.map(key => (
                       <td key={key} className="max-w-56 truncate px-5 py-4 text-slate-600">
@@ -383,11 +585,6 @@ export default function ResourcePage({ role, section }: { role: string; section:
                         )}
                         {cfg.actions?.includes('edit') && (
                           <ActionButton title="Edit" onClick={() => openForm(item)} color="text-blue-600">
-                            <Pencil size={15} />
-                          </ActionButton>
-                        )}
-                        {cfg.actions?.includes('status') && (
-                          <ActionButton title="Ubah status" onClick={() => action(item, 'status')} color="text-amber-600">
                             <Pencil size={15} />
                           </ActionButton>
                         )}
@@ -422,29 +619,28 @@ export default function ResourcePage({ role, section }: { role: string; section:
             </Table>
           </div>
         )}
+        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
 
-      {modal && (
+      {modal && !confirm && (
         <Modal title={`${edit ? 'Edit' : 'Tambah'} ${titleCase(section)}`} onClose={() => setModal(false)}>
           <form onSubmit={save} className="mt-5 space-y-4">
             {fields.map(field =>
               field.name === 'kelas' && useMasterKelas ? (
                 <label key={field.name} className="block text-xs font-semibold text-slate-600">
                   {field.label}
-                  <Select
+                  <SelectField
                     className="mt-2"
                     required={field.required}
+                    name={field.name}
                     value={form[field.name] || ''}
-                    onChange={event => setForm({ ...form, [field.name]: event.target.value })}
-                  >
-                    <option value="">Pilih kelas</option>
-                    {kelasMaster.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {option.nama}
-                        {option.jurusan ? ` (${option.jurusan})` : ''}
-                      </option>
-                    ))}
-                  </Select>
+                    onValueChange={value => setForm({ ...form, [field.name]: value })}
+                    placeholder="Pilih Kelas"
+                    options={kelasMaster.map(option => ({
+                      value: option.id,
+                      label: `${label(option.nama)}${option.jurusan ? ` (${label(option.jurusan)})` : ''}`,
+                    }))}
+                  />
                   {!kelasMaster.length && (
                     <span className="mt-1 block font-normal text-slate-400">
                       Belum ada master kelas. Tambahkan terlebih dahulu di Data Kelas.
@@ -454,14 +650,18 @@ export default function ResourcePage({ role, section }: { role: string; section:
               ) : field.name === 'dudiId' && role === 'guru' && section === 'kunjungan' ? (
                 <label key={field.name} className="block text-xs font-semibold text-slate-600">
                   Perusahaan Mitra
-                  <Select className="mt-2" required value={form.dudiId || ''} onChange={event => setForm({ ...form, dudiId: event.target.value })}>
-                    <option value="">Pilih DUDI bimbingan</option>
-                    {dudiOptions.map(option => (
-                      <option key={option.id} value={option.id}>
-                        {option.nama_perusahaan}
-                      </option>
-                    ))}
-                  </Select>
+                  <SelectField
+                    className="mt-2"
+                    required
+                    name="dudiId"
+                    value={form.dudiId || ''}
+                    onValueChange={value => setForm({ ...form, dudiId: value })}
+                    placeholder="Pilih DUDI Bimbingan"
+                    options={dudiOptions.map(option => ({
+                      value: option.id,
+                      label: label(option.nama_perusahaan),
+                    }))}
+                  />
                   {!dudiOptions.length && (
                     <span className="mt-1 block font-normal text-slate-400">Tidak ada DUDI dari siswa bimbingan Anda.</span>
                   )}
@@ -510,6 +710,16 @@ export default function ResourcePage({ role, section }: { role: string; section:
           </div>
         </Modal>
       )}
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        title={confirm?.title || ''}
+        description={confirm?.message || ''}
+        confirmLabel={confirm?.confirmLabel}
+        tone={confirm?.tone}
+        loading={confirming}
+        onCancel={() => setConfirm(null)}
+        onConfirm={confirmAndRun}
+      />
       {detailLoading && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/30 text-sm font-medium text-white">
           Memuat detail siswa...
