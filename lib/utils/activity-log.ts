@@ -29,6 +29,32 @@ export function getActivities(): ActivityLogEntry[] {
   return readLogs();
 }
 
+export function formatTimeAgo(iso: string) {
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return '-';
+
+  const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return 'Baru saja';
+  if (minutes < 60) return `${minutes} menit lalu`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} jam lalu`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} hari lalu`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} bulan lalu`;
+
+  return `${Math.floor(months / 12)} tahun lalu`;
+}
+
+export function formatActivityTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export function recordActivity(input: { action: string; menu: string; detail: string }) {
   if (typeof window === 'undefined') return;
   let user: SessionUser | null = null;
