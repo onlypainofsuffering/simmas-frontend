@@ -35,6 +35,13 @@ const pageDescriptions: Record<string, string> = {
   'Penempatan Data': 'Kelola Penempatan Data',
 };
 
+const addLabels: Record<string, string> = {
+  'admin:guru': 'Tambah',
+  'admin:siswa': 'Tambah',
+  'admin:kelas': 'Tambah',
+  'admin:mitra': 'Tambah',
+};
+
 function visitStatus(item: Row) {
   const raw = item.tanggal ?? item.tanggalKunjungan;
   const parts = typeof raw === 'string' ? raw.slice(0, 10).split('-').map(Number) : [];
@@ -562,6 +569,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     [clientFiltered],
   );
 
+  const resourceLabel = section === 'mitra' ? 'Dudi' : titleCase(section);
   const columnLabel = (key: string) => (key === 'isActive' ? 'Status' : titleCase(key));
   const displayValue = (key: string, value: any) => {
     if (key === 'kuota_peserta') return value === true || value === 'true' ? 'Tersedia' : 'Penuh';
@@ -595,15 +603,15 @@ export default function ResourcePage({ role, section }: { role: string; section:
       >
         {cfg.createPath && (
           <Button onClick={() => openForm()}>
-            <Plus size={16} /> Data
+            <Plus size={16} /> {addLabels[`${role}:${section}`] || 'Tambah'}
           </Button>
         )}
       </PageHeader>
 
       {cfg.path && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <StatCard title="Data" value={data.length} detail="Data tersedia" />
-          <StatCard title="Aktif" value={activeCount} detail="Data aktif" tone="green" />
+          <StatCard title={resourceLabel} value={data.length} detail={`${resourceLabel} tersedia`} />
+          <StatCard title="Aktif" value={activeCount} detail={`${resourceLabel} aktif`} tone="green" />
           <StatCard
             title="Hasil Ditampilkan"
             value={filtered.length}

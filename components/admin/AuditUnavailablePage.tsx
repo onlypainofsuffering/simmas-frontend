@@ -71,14 +71,7 @@ export default function AuditUnavailablePage() {
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="right" align="start">
-                              <div className="space-y-1">
-                                <p className="font-semibold">{formatActivityTime(item.occurredAt)}</p>
-                                <p>
-                                  {item.action} · {item.menu}
-                                </p>
-                                <p className="text-slate-300">{item.detail}</p>
-                                <p className="text-slate-300">Oleh {item.actor}</p>
-                              </div>
+                              {formatActivityTime(item.occurredAt)}
                             </TooltipContent>
                           </Tooltip>
                         </td>
