@@ -144,7 +144,7 @@ export const preferredColumns: Record<string, string[]> = {
   'admin:monitoring siswa': ['nama', 'kelas', 'dudi', 'pembimbing', 'kehadiran', 'jumlah_jurnal', 'status'],
   'admin:Monitoring Kunjungan': ['tanggal', 'status', 'guru_pembimbing', 'tempat_magang', 'catatan_kunjungan'],
   'admin:siswa': ['nama', 'nis', 'kelas', 'status', 'isActive'],
-  'admin:guru': ['namalengkap', 'nip', 'alamat' , 'jurusan', 'status', 'isActive'],
+  'admin:guru': ['namalengkap', 'nip', 'alamat' , 'jurusan', 'isActive'],
   'admin:mitra': ['nama_perusahaan', 'bidang_usaha', 'direktur' , 'alamat', 'kontak', 'status', 'isActive'],
   'admin:Penempatan Data': ['siswa', 'dudi', 'guruPembimbing', 'posisi', 'status'],
   'guru:siswa': ['siswa', 'penempatan'],

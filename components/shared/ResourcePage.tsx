@@ -59,7 +59,12 @@ function errorMessage(error: unknown, fallback: string) {
 
 function identityOf(row?: Row | null) {
   if (!row) return '-';
-  return String(row.namalengkap || row.nama || row.nama_perusahaan || row.nis || row.id || '-');
+  return String(row.namalengkap || row.nama || row.nama_perusahaan || row.nis || '-');
+}
+
+function isIdKey(key: string) {
+  const normalized = key.toLowerCase();
+  return normalized === 'id' || normalized.endsWith('id');
 }
 
 function filterLabel(key: string) {
@@ -86,6 +91,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [detail, setDetail] = useState<Row | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
+  const [teacherOptions, setTeacherOptions] = useState<Row[]>([]);
   const [kelasMaster, setKelasMaster] = useState<Row[]>([]);
   const debouncedFilters = useDebounce(filters, 300);
   const debouncedQuery = useDebounce(query, 200);
@@ -134,8 +140,12 @@ export default function ResourcePage({ role, section }: { role: string; section:
   };
   const cols = useMemo(() => {
     const keys = Array.from(new Set(data.slice(0, 8).flatMap(item => Object.keys(item || {}))));
+    const hidden = role === 'admin' && section === 'guru' ? ['status'] : [];
     const visible = keys.filter(
-      key => !['id', 'kelasid', 'password', 'updatedat', 'createdat', 'role', 'fotoUrl'].includes(key.toLowerCase()),
+      key =>
+        !['password', 'updatedat', 'createdat', 'role', 'fotoUrl'].includes(key.toLowerCase()) &&
+        !isIdKey(key) &&
+        !hidden.includes(key.toLowerCase()),
     );
     const preferred = preferredColumns[`${role}:${section}`] || [];
     return [...preferred.filter(key => visible.includes(key)), ...visible.filter(key => !preferred.includes(key))].slice(0, 7);
@@ -198,11 +208,19 @@ export default function ResourcePage({ role, section }: { role: string; section:
   }, [role, section]);
 
   useEffect(() => {
-    if (role !== 'admin' || section !== 'siswa') return;
+    if (role !== 'admin' || !['siswa', 'Penempatan Data'].includes(section)) return;
     adminService
       .getCompanies()
       .then(result => setDudiOptions(rowsOf(result)))
       .catch(error => setErr(error instanceof Error ? error.message : 'Gagal memuat master dudi.'));
+  }, [role, section]);
+
+  useEffect(() => {
+    if (role !== 'admin' || section !== 'Penempatan Data') return;
+    adminService
+      .getActiveTeachers()
+      .then(result => setTeacherOptions(rowsOf(result)))
+      .catch(error => setErr(error instanceof Error ? error.message : 'Gagal memuat guru aktif.'));
   }, [role, section]);
 
   useEffect(() => {
@@ -544,7 +562,8 @@ export default function ResourcePage({ role, section }: { role: string; section:
     [clientFiltered],
   );
 
-  const columnLabel = (key: string) => (key === 'isActive' ? 'Status Aktif' : titleCase(key));
+  const columnLabel = (key: string) =>
+    key === 'isActive' && role === 'admin' && section === 'guru' ? 'Status' : titleCase(key);
   const displayValue = (key: string, value: any) => {
     if (key === 'kuota_peserta') return value === true || value === 'true' ? 'Tersedia' : 'Penuh';
     if (key === 'isActive') return value === true || value === 'true' ? 'AKTIF' : 'NONAKTIF';
@@ -576,7 +595,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
       >
         {cfg.createPath && (
           <Button onClick={() => openForm()}>
-            <Plus size={16} /> Tambah Data
+            <Plus size={16} /> Data
           </Button>
         )}
       </PageHeader>
@@ -780,6 +799,44 @@ export default function ResourcePage({ role, section }: { role: string; section:
                     </span>
                   )}
                 </label>
+              ) : field.name === 'dudiId' && role === 'admin' && section === 'Penempatan Data' ? (
+                <label key={field.name} className="block text-xs font-semibold text-slate-600">
+                  Perusahaan
+                  <SelectField
+                    className="mt-2"
+                    required={field.required}
+                    name="dudiId"
+                    value={form.dudiId || ''}
+                    onValueChange={value => setForm({ ...form, dudiId: value })}
+                    placeholder="Pilih Perusahaan"
+                    options={dudiOptions.map(option => ({
+                      value: option.id,
+                      label: label(option.nama_perusahaan),
+                    }))}
+                  />
+                  {!dudiOptions.length && (
+                    <span className="mt-1 block font-normal text-slate-400">Belum ada data DUDI.</span>
+                  )}
+                </label>
+              ) : field.name === 'guruPembimbingId' && role === 'admin' && section === 'Penempatan Data' ? (
+                <label key={field.name} className="block text-xs font-semibold text-slate-600">
+                  Guru Pembimbing
+                  <SelectField
+                    className="mt-2"
+                    required={field.required}
+                    name="guruPembimbingId"
+                    value={form.guruPembimbingId || ''}
+                    onValueChange={value => setForm({ ...form, guruPembimbingId: value })}
+                    placeholder="Pilih Guru Pembimbing"
+                    options={teacherOptions.map(option => ({
+                      value: option.id,
+                      label: label(option.namalengkap),
+                    }))}
+                  />
+                  {!teacherOptions.length && (
+                    <span className="mt-1 block font-normal text-slate-400">Belum ada guru aktif.</span>
+                  )}
+                </label>
               ) : field.name === 'dudiId' && role === 'guru' && section === 'kunjungan' ? (
                 <label key={field.name} className="block text-xs font-semibold text-slate-600">
                   Perusahaan Mitra
@@ -832,7 +889,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
           <div className="grid gap-3 sm:grid-cols-2">
             {Object.entries(detail)
               .filter(([key]) => !key.toLowerCase().includes('password'))
-              .filter(([key]) => !(role === 'admin' && section === 'siswa' && key.toLowerCase() === 'id'))
+              .filter(([key]) => !isIdKey(key))
               .map(([key, value]) => (
                 <div key={key} className="rounded-lg bg-slate-50 p-3">
                   <div className="text-[10px] uppercase text-slate-400">{detailLabel(key)}</div>
@@ -903,7 +960,7 @@ function DetailValue({ value }: { value: any }) {
     const entries = Object.entries(value).filter(
       ([key]) => key !== 'format' && !key.toLowerCase().includes('id') && !key.toLowerCase().includes('password'),
     );
-    if (!entries.length) return <>{label(value)}</>;
+    if (!entries.length) return <>-</>;
     return (
       <div className="space-y-1">
         {entries.map(([key, item]) => (

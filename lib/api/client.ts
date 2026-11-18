@@ -1,6 +1,15 @@
 import { TOKEN_KEY, USER_KEY } from '@/lib/auth/auth.config';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3003/api';
+const configuredApiBase =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== 'undefined' && !['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? 'https://simmas-backend-production.up.railway.app/api'
+    : 'http://localhost:3003/api');
+
+const normalizedApiBase = configuredApiBase.replace(/\/+$/, '');
+export const API_BASE = normalizedApiBase.endsWith('/api')
+  ? normalizedApiBase
+  : `${normalizedApiBase}/api`;
 
 export function getToken() {
   if (typeof window === 'undefined') return '';
