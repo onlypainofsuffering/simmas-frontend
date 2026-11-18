@@ -74,15 +74,7 @@ export default function StudentApplication() {
           recordActivity({ action: 'Tambah', menu: 'Pengajuan Magang', detail: `Pengajuan ${posisi}` });
           setNotice(response?.message || 'Pengajuan magang berhasil dikirim.');
           setForm({ dudiId: '', posisi: '' });
-          try {
-            setInfo(await siswaService.getDashboard());
-          } catch (error) {
-            setErr(
-              `Pengajuan berhasil dikirim, tetapi status terbaru gagal dimuat: ${
-                error instanceof Error ? error.message : 'kesalahan tidak diketahui'
-              }`,
-            );
-          }
+          void siswaService.getDashboard().then(setInfo).catch(() => undefined);
         } catch (error) {
           setErr(error instanceof Error ? error.message : 'Gagal mengirim pengajuan magang.');
         }

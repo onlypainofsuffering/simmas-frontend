@@ -1,6 +1,7 @@
 import type { Field } from '@/types/resource';
 import { Input } from '@/components/ui/Input';
 import { SelectField } from '@/components/ui/Select';
+import { cn } from '@/lib/utils/cn';
 
 interface FormFieldProps {
   field: Field;
@@ -29,6 +30,33 @@ export function FormField({ field, value, onChange, isEdit = false }: FormFieldP
           }))}
         />
       </label>
+    );
+  }
+
+  if (field.type === 'toggle') {
+    const active = value === true || value === 'true';
+    return (
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+        <span className="text-xs font-semibold text-slate-600">{field.label}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={active}
+          aria-label={field.label}
+          onClick={() => onChange(!active)}
+          className={cn(
+            'relative h-5 w-10 rounded-full transition',
+            active ? 'bg-emerald-500' : 'bg-slate-300',
+          )}
+        >
+          <span
+            className={cn(
+              'absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all',
+              active ? 'left-5' : 'left-0.5',
+            )}
+          />
+        </button>
+      </div>
     );
   }
 

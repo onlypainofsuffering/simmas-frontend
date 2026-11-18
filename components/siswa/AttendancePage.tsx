@@ -75,8 +75,11 @@ export default function AttendancePage() {
           if (keterangan) body.append('keterangan', keterangan);
           if (statusAbsen === 'HADIR' && foto) body.append('foto', foto);
           const response = await absensiService.checkIn(body);
-          setToday(dataOf(response));
-          await load();
+          const saved = dataOf(response);
+          setToday(saved);
+          if (saved && typeof saved === 'object') {
+            setHistory(prev => [saved, ...prev.filter(item => item.id !== saved.id)]);
+          }
           recordActivity({ action: 'Tambah', menu: 'Absensi Siswa', detail: `Absen masuk ${label(statusAbsen)}` });
           setNotice('Absensi masuk berhasil dikirim.');
         } catch (error) {
@@ -103,8 +106,11 @@ export default function AttendancePage() {
           const body = new FormData();
           if (fotoKeluar) body.append('foto', fotoKeluar);
           const response = await absensiService.checkOut(body);
-          setToday(dataOf(response));
-          await load();
+          const saved = dataOf(response);
+          setToday(saved);
+          if (saved && typeof saved === 'object') {
+            setHistory(prev => prev.map(item => (item.id === saved.id ? { ...item, ...saved } : item)));
+          }
           recordActivity({ action: 'Ubah', menu: 'Absensi Siswa', detail: 'Absen pulang' });
           setNotice('Absensi pulang berhasil dikirim.');
         } catch (error) {

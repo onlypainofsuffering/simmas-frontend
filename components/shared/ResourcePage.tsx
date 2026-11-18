@@ -5,8 +5,9 @@ import { Check, Eye, Filter, Pencil, Plus, Save, Search, Trash2, X } from 'lucid
 import { api, dataOf, json, label, rowsOf } from '@/lib/api/client';
 import { resourceConfigs, preferredColumns, statusChoices } from '@/constants/resource-config';
 import { cellValue, idOf, titleCase } from '@/lib/utils/resource';
-import { toInputDate } from '@/lib/utils/format-date';
+import { formatDate, formatTime, toInputDate } from '@/lib/utils/format-date';
 import { recordActivity } from '@/lib/utils/activity-log';
+import { useDebounce } from '@/hooks/useDebounce';
 import { usePagination } from '@/hooks/usePagination';
 import { adminService } from '@/services/admin.service';
 import { guruService } from '@/services/guru.service';
@@ -86,6 +87,8 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
   const [kelasMaster, setKelasMaster] = useState<Row[]>([]);
+  const debouncedFilters = useDebounce(filters, 300);
+  const debouncedQuery = useDebounce(query, 200);
 
   const resolveFields = useCallback(
     (isEdit: boolean): Field[] => {
@@ -93,7 +96,12 @@ export default function ResourcePage({ role, section }: { role: string; section:
       if (!isEdit || !cfg.actions?.includes('status') || base.some(field => field.name === 'status')) return base;
       return [
         ...base,
-        { name: 'status', label: 'Status', type: 'select', options: statusChoices[section] || [] },
+        {
+          name: 'status',
+          label: section === 'siswa' || section === 'Penempatan Data' ? 'Status Magang' : 'Status',
+          type: 'select',
+          options: statusChoices[section] || [],
+        },
       ];
     },
     [cfg.actions, cfg.editFields, cfg.fields, section],
@@ -126,7 +134,9 @@ export default function ResourcePage({ role, section }: { role: string; section:
   };
   const cols = useMemo(() => {
     const keys = Array.from(new Set(data.slice(0, 8).flatMap(item => Object.keys(item || {}))));
-    const visible = keys.filter(key => !['id', 'password', 'updatedat', 'createdat', 'role', 'fotoUrl'].includes(key.toLowerCase()));
+    const visible = keys.filter(
+      key => !['id', 'kelasid', 'password', 'updatedat', 'createdat', 'role', 'fotoUrl'].includes(key.toLowerCase()),
+    );
     const preferred = preferredColumns[`${role}:${section}`] || [];
     return [...preferred.filter(key => visible.includes(key)), ...visible.filter(key => !preferred.includes(key))].slice(0, 7);
   }, [data, role, section]);
@@ -141,13 +151,23 @@ export default function ResourcePage({ role, section }: { role: string; section:
     recordActivity({ action, menu: activityMenu(), detail });
   }
 
-  const load = useCallback(async () => {
+  const serverFilterKey = useMemo(
+    () =>
+      Object.entries(debouncedFilters)
+        .filter(([key, value]) => Boolean(value) && !cfg.clientFilters?.includes(key))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&'),
+    [cfg.clientFilters, debouncedFilters],
+  );
+
+  const load = useCallback(async (background = false) => {
     if (!cfg.path) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     setErr('');
     try {
       const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
+      Object.entries(debouncedFilters).forEach(([key, value]) => {
         if (value && !cfg.clientFilters?.includes(key)) params.set(key, value);
       });
       const suffix = params.toString();
@@ -161,9 +181,9 @@ export default function ResourcePage({ role, section }: { role: string; section:
     } catch (error) {
       setErr(error instanceof Error ? error.message : 'Gagal memuat data.');
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
-  }, [cfg.path, cfg.clientFilters, filters, isKunjunganMonitoring]);
+  }, [cfg.path, cfg.clientFilters, isKunjunganMonitoring, serverFilterKey]);
 
   useEffect(() => {
     load();
@@ -175,6 +195,14 @@ export default function ResourcePage({ role, section }: { role: string; section:
       .getGuidedCompanies()
       .then(result => setDudiOptions(rowsOf(result)))
       .catch(error => setErr(error instanceof Error ? error.message : 'Gagal memuat DUDI bimbingan.'));
+  }, [role, section]);
+
+  useEffect(() => {
+    if (role !== 'admin' || section !== 'siswa') return;
+    adminService
+      .getCompanies()
+      .then(result => setDudiOptions(rowsOf(result)))
+      .catch(error => setErr(error instanceof Error ? error.message : 'Gagal memuat master dudi.'));
   }, [role, section]);
 
   useEffect(() => {
@@ -192,7 +220,13 @@ export default function ResourcePage({ role, section }: { role: string; section:
     const initial: Row = {};
     resolveFields(Boolean(item)).forEach(field => {
       initial[field.name] =
-        field.type === 'date' ? toInputDate(item?.[field.name]) : item?.[field.name] ?? (field.name === 'namalengkap' ? item?.nama : '');
+        field.type === 'toggle'
+          ? item
+            ? item[field.name] !== false
+            : true
+          : field.type === 'date'
+            ? toInputDate(item?.[field.name])
+            : item?.[field.name] ?? (field.name === 'namalengkap' ? item?.nama : '');
     });
     if (useMasterKelas) {
       const matched = kelasMaster.find(
@@ -261,9 +295,26 @@ export default function ResourcePage({ role, section }: { role: string; section:
             body.append(field.name, String(value ?? ''));
           }
         });
-        await api(path, { method: edit ? 'PATCH' : 'POST', body });
-        await updateStatusIfNeeded();
+        const [savedResponse] = await Promise.all([
+          api(path, { method: edit ? 'PATCH' : 'POST', body }),
+          updateStatusIfNeeded(),
+        ]);
         logChange(edit ? 'Ubah' : 'Tambah', detail);
+        const saved = dataOf(savedResponse);
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          const savedId = rowId(saved);
+          setData(prev =>
+            edit
+              ? prev.map(row => (rowId(row) === rowId(edit) ? { ...row, ...saved } : row))
+              : savedId && prev.some(row => rowId(row) === savedId)
+                ? prev.map(row => (rowId(row) === savedId ? { ...row, ...saved } : row))
+                : [saved, ...prev],
+          );
+        }
+        setModal(false);
+        setNotice('Data berhasil disimpan.');
+        void load(true);
+        return;
       } else {
         const body: Row = {};
         fields.forEach(field => {
@@ -274,25 +325,38 @@ export default function ResourcePage({ role, section }: { role: string; section:
             body.kelasId = Number(value);
           } else if (['dudiId', 'guruPembimbingId'].includes(field.name)) {
             body[field.name] = Number(value);
-          } else if (field.name === 'kuota_peserta') {
+          } else if (field.name === 'kuota_peserta' || field.name === 'isActive') {
             body[field.name] = value === true || value === 'true';
           } else {
             body[field.name] = value;
           }
         });
-        const response = await api(path, json(edit ? 'PATCH' : 'POST', body));
-        await updateStatusIfNeeded();
+        const [response] = await Promise.all([
+          api(path, json(edit ? 'PATCH' : 'POST', body)),
+          updateStatusIfNeeded(),
+        ]);
         logChange(edit ? 'Ubah' : 'Tambah', detail);
+        const saved = dataOf(response);
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          const savedId = rowId(saved);
+          setData(prev =>
+            edit
+              ? prev.map(row => (rowId(row) === rowId(edit) ? { ...row, ...saved } : row))
+              : savedId && prev.some(row => rowId(row) === savedId)
+                ? prev.map(row => (rowId(row) === savedId ? { ...row, ...saved } : row))
+                : [saved, ...prev],
+          );
+        }
         const userEmail = response?.data?.email;
         const message = response?.message || 'Data berhasil disimpan.';
         setModal(false);
         setNotice(userEmail && !edit ? `${message}. Email akun: ${userEmail}` : message);
-        await load();
+        void load(true);
         return;
       }
       setModal(false);
       setNotice('Data berhasil disimpan.');
-      await load();
+      void load(true);
     } catch (error) {
       setErr(errorMessage(error, 'Gagal menyimpan data.'));
     }
@@ -319,7 +383,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     try {
       await task();
       setNotice('Aksi berhasil diproses.');
-      await load();
+      void load(true);
     } catch (error) {
       setErr(errorMessage(error, 'Aksi gagal diproses.'));
     }
@@ -357,6 +421,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
           tone: 'danger',
           onConfirm: () => runAction(async () => {
             await api(`${cfg.path}/${id}`, { method: 'DELETE' });
+            setData(prev => prev.filter(row => rowId(row) !== id));
             logChange('Hapus', identityOf(item));
           }),
         });
@@ -444,23 +509,64 @@ export default function ResourcePage({ role, section }: { role: string; section:
     }
   }
 
-  const clientFiltered = data.filter(item =>
-    (cfg.clientFilters || []).every(key => {
-      const value = filters[key];
-      return !value || String(cellValue(item, key) ?? '') === value;
-    }),
+  const searchIndex = useMemo(
+    () => new Map(data.map(item => [item, JSON.stringify(item).toLowerCase()] as const)),
+    [data],
   );
-  const filtered = clientFiltered.filter(item => JSON.stringify(item).toLowerCase().includes(query.toLowerCase()));
+  const clientFiltered = useMemo(
+    () =>
+      data.filter(item =>
+        (cfg.clientFilters || []).every(key => {
+          const value = filters[key];
+          return !value || String(cellValue(item, key) ?? '') === value;
+        }),
+      ),
+    [cfg.clientFilters, data, filters],
+  );
+  const filtered = useMemo(
+    () => clientFiltered.filter(item => (searchIndex.get(item) || '').includes(debouncedQuery.toLowerCase())),
+    [clientFiltered, debouncedQuery, searchIndex],
+  );
   const { page, setPage, totalPages, pageItems: paginated } = usePagination(filtered, 5);
 
   useEffect(() => {
     setPage(1);
   }, [filters, query, setPage]);
 
-  const activeCount = clientFiltered.filter(item =>
-    ['AKTIF', 'SEDANG_MAGANG', 'TERVERIFIKASI', 'DISETUJUI'].includes(String(item.status || '').toUpperCase()),
-  ).length;
-  const pendingCount = clientFiltered.filter(item => /MENUNGGU|DITINJAU|VALIDASI/i.test(String(item.status || ''))).length;
+  const activeCount = useMemo(
+    () =>
+      clientFiltered.filter(item => {
+        if (item.isActive !== undefined) return item.isActive === true;
+        return ['AKTIF', 'SEDANG_MAGANG', 'TERVERIFIKASI', 'DISETUJUI'].includes(
+          String(item.status || '').toUpperCase(),
+        );
+      }).length,
+    [clientFiltered],
+  );
+
+  const columnLabel = (key: string) => (key === 'isActive' ? 'Status Aktif' : titleCase(key));
+  const displayValue = (key: string, value: any) => {
+    if (key === 'kuota_peserta') return value === true || value === 'true' ? 'Tersedia' : 'Penuh';
+    if (key === 'isActive') return value === true || value === 'true' ? 'AKTIF' : 'NONAKTIF';
+    return label(value);
+  };
+  const isTimestampKey = (key: string) =>
+    ['createdat', 'created_at', 'updatedat', 'updated_at'].includes(key.toLowerCase());
+  const detailLabel = (key: string) => {
+    const normalized = key.toLowerCase();
+    if (normalized === 'createdat' || normalized === 'created_at') return 'Dibuat Pada';
+    if (normalized === 'updatedat' || normalized === 'updated_at') return 'Diubah Pada';
+    return titleCase(key);
+  };
+  const detailValue = (key: string, value: any) => {
+    if (isTimestampKey(key)) {
+      const formattedDate = formatDate(value, { day: '2-digit', month: 'long', year: 'numeric' });
+      if (formattedDate === value) return value;
+      return `${formattedDate}, ${formatTime(value)}`;
+    }
+    if (key === 'kuota_peserta' || key === 'isActive') return displayValue(key, value);
+    return value;
+  };
 
   return (
     <div className="space-y-5">
@@ -476,10 +582,9 @@ export default function ResourcePage({ role, section }: { role: string; section:
       </PageHeader>
 
       {cfg.path && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard title="Data" value={data.length} detail="Data tersedia" />
-          <StatCard title="Aktif" value={activeCount} detail="Data aktif / berjalan" tone="green" />
-          <StatCard title="Perlu Perhatian" value={pendingCount} detail="Menunggu tindak lanjut" tone="amber" />
+          <StatCard title="Aktif" value={activeCount} detail="Data aktif" tone="green" />
           <StatCard
             title="Hasil Ditampilkan"
             value={filtered.length}
@@ -510,6 +615,18 @@ export default function ResourcePage({ role, section }: { role: string; section:
                         placeholder={filterLabel(key)}
                         emptyLabel={`Semua ${filterLabel(key)}`}
                         options={kelasOptions.map(value => ({ value, label: value }))}
+                      />
+                    ) : key === 'dudiId' && dudiOptions.length ? (
+                      <SelectField
+                        className="h-[42px]"
+                        value={filters[key] || ''}
+                        onValueChange={value => setFilters({ ...filters, [key]: value })}
+                        placeholder={filterLabel(key)}
+                        emptyLabel={`Semua ${filterLabel(key)}`}
+                        options={dudiOptions.map(option => ({
+                          value: option.id,
+                          label: label(option.nama_perusahaan),
+                        }))}
                       />
                     ) : key === 'status' || key === 'jurusan' ? (
                       <SelectField
@@ -553,7 +670,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                 <tr>
                   {cols.map(key => (
                     <th key={key} className="px-5 py-4 font-semibold">
-                      {titleCase(key)}
+                      {columnLabel(key)}
                     </th>
                   ))}
                   <th className="px-5 py-4 text-right">Aksi</th>
@@ -563,11 +680,27 @@ export default function ResourcePage({ role, section }: { role: string; section:
                 {paginated.map((item, index) => (
                   <tr key={rowId(item) || index} className="hover:bg-slate-50/70">
                     {cols.map(key => (
-                      <td key={key} className="max-w-56 truncate px-5 py-4 text-slate-600">
-                        {key.toLowerCase().includes('status') ? (
-                          <Badge>{label(cellValue(item, key))}</Badge>
+                      <td key={key} className={`px-5 py-4 text-slate-600 ${key === 'kehadiran' ? '' : 'max-w-56 truncate'}`}>
+                        {key === 'kehadiran' ? (
+                          <AttendanceBadges value={cellValue(item, key)} />
+                        ) : key === 'isActive' || key.toLowerCase().includes('status') ? (
+                          <Badge
+                            className={
+                              key === 'isActive'
+                                ? item.isActive
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-slate-100 text-slate-500'
+                                : undefined
+                            }
+                          >
+                            {key === 'isActive'
+                              ? item.isActive
+                                ? 'AKTIF'
+                                : 'NONAKTIF'
+                              : displayValue(key, cellValue(item, key))}
+                          </Badge>
                         ) : (
-                          label(cellValue(item, key))
+                          displayValue(key, cellValue(item, key))
                         )}
                       </td>
                     ))}
@@ -699,11 +832,16 @@ export default function ResourcePage({ role, section }: { role: string; section:
           <div className="grid gap-3 sm:grid-cols-2">
             {Object.entries(detail)
               .filter(([key]) => !key.toLowerCase().includes('password'))
+              .filter(([key]) => !(role === 'admin' && section === 'siswa' && key.toLowerCase() === 'id'))
               .map(([key, value]) => (
                 <div key={key} className="rounded-lg bg-slate-50 p-3">
-                  <div className="text-[10px] uppercase text-slate-400">{titleCase(key)}</div>
+                  <div className="text-[10px] uppercase text-slate-400">{detailLabel(key)}</div>
                   <div className="mt-1 break-words text-xs font-medium text-slate-700">
-                    <DetailValue value={value} />
+                    {key === 'kehadiran' ? (
+                      <AttendanceBadges value={value} />
+                    ) : (
+                      <DetailValue value={detailValue(key, value)} />
+                    )}
                   </div>
                 </div>
               ))}
@@ -725,6 +863,32 @@ export default function ResourcePage({ role, section }: { role: string; section:
           Memuat detail siswa...
         </div>
       )}
+    </div>
+  );
+}
+
+function AttendanceBadges({ value }: { value: any }) {
+  const source = value && typeof value === 'object' ? value : {};
+  const format = typeof value === 'string' ? value : String(source.format || '');
+  const count = (letter: string, field: string) => {
+    if (source[field] !== undefined) return source[field];
+    const match = format.match(new RegExp(`${letter}:\\s*(\\d+)`));
+    return match ? match[1] : 0;
+  };
+  const items = [
+    { letter: 'H', count: count('H', 'hadir'), tone: 'bg-emerald-50 text-emerald-700' },
+    { letter: 'S', count: count('S', 'sakit'), tone: 'bg-amber-50 text-amber-700' },
+    { letter: 'I', count: count('I', 'izin'), tone: 'bg-blue-50 text-blue-700' },
+    { letter: 'A', count: count('A', 'alpha'), tone: 'bg-rose-50 text-rose-700' },
+  ];
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.map(item => (
+        <Badge key={item.letter} className={`px-2 py-0.5 text-[10px] ${item.tone}`}>
+          {item.letter}: {item.count}
+        </Badge>
+      ))}
     </div>
   );
 }

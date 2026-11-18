@@ -29,21 +29,33 @@ export async function api(path: string, options: RequestInit = {}) {
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (!(options.body instanceof FormData) && options.body !== undefined) headers.set('Content-Type', 'application/json');
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: 'no-store' });
-  const text = await res.text();
-  let data: any = null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
   try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-  if (!res.ok) {
-    if (res.status === 401) {
-      logout();
+    const res = await fetch(`${API_BASE}${path}`, { ...options, headers, cache: 'no-store', signal: controller.signal });
+    let data: any = null;
+    try {
+      data = await res.json();
+    } catch {
+      data = null;
     }
-    throw new Error(data?.message || data?.error || `Request gagal (${res.status})`);
+    if (!res.ok) {
+      if (res.status === 401) {
+        logout();
+      }
+      throw new Error(data?.message || data?.error || `Request gagal (${res.status})`);
+    }
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout. Silakan coba lagi.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return data;
 }
 
 export const json = (method: string, body?: any): RequestInit => ({

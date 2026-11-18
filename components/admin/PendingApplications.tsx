@@ -93,7 +93,7 @@ export default function PendingApplications() {
             detail: `${label(application.siswa?.nama)} - ${status}`,
           });
           setNotice(response?.message || `Pengajuan berhasil ${approved ? 'disetujui' : 'ditolak'}.`);
-          await load();
+          setApplications(prev => prev.filter(item => idOf(item) !== id));
         } catch (error) {
           setErr(error instanceof Error ? error.message : 'Gagal memproses pengajuan.');
         }
