@@ -7,7 +7,7 @@ export const companyFields: Field[] = [
   { name: 'kuota_peserta', label: 'Kuota Peserta Tersedia', type: 'select', options: ['true', 'false'], required: true },
   { name: 'direktur', label: 'Direktur', required: true },
   { name: 'kontak', label: 'Kontak', required: true, numeric: true },
-  { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+  { name: 'isActive', label: 'Status', type: 'toggle' },
 ];
 
 export const resourceConfigs: Record<string, PageConfig> = {
@@ -23,7 +23,7 @@ export const resourceConfigs: Record<string, PageConfig> = {
     fields: [
       { name: 'nama', label: 'Nama Kelas', required: true },
       { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'] },
-      { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+      { name: 'isActive', label: 'Status', type: 'toggle' },
     ],
     actions: ['edit', 'delete'],
   },
@@ -35,13 +35,13 @@ export const resourceConfigs: Record<string, PageConfig> = {
       { name: 'nama', label: 'Nama Lengkap', required: true },
       { name: 'nis', label: 'NIS', required: true, noLetters: true },
       { name: 'kelas', label: 'Kelas', required: true },
-      { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+      { name: 'isActive', label: 'Status', type: 'toggle' },
     ],
     editFields: [
       { name: 'namalengkap', label: 'Nama Lengkap' },
       { name: 'nis', label: 'NIS', noLetters: true },
       { name: 'kelas', label: 'Kelas' },
-      { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+      { name: 'isActive', label: 'Status', type: 'toggle' },
     ],
     actions: ['edit', 'delete', 'status'],
   },
@@ -54,14 +54,14 @@ export const resourceConfigs: Record<string, PageConfig> = {
       { name: 'nip', label: 'NIP', required: true, numeric: true },
       { name: 'alamat', label: 'Alamat', required: true},
       { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'], required: true },
-      { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+      { name: 'isActive', label: 'Status', type: 'toggle' },
     ],
     editFields: [
       { name: 'namalengkap', label: 'Nama Lengkap' },
       { name: 'nip', label: 'NIP', numeric: true },
       { name: 'alamat', label: 'Alamat'},
       { name: 'jurusan', label: 'Jurusan', type: 'select', options: ['RPL', 'TKJ', 'MM'] },
-      { name: 'isActive', label: 'Status Aktif', type: 'toggle' },
+      { name: 'isActive', label: 'Status', type: 'toggle' },
     ],
     actions: ['edit', 'delete'],
   },

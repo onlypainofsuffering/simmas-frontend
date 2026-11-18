@@ -562,8 +562,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     [clientFiltered],
   );
 
-  const columnLabel = (key: string) =>
-    key === 'isActive' && role === 'admin' && section === 'guru' ? 'Status' : titleCase(key);
+  const columnLabel = (key: string) => (key === 'isActive' ? 'Status' : titleCase(key));
   const displayValue = (key: string, value: any) => {
     if (key === 'kuota_peserta') return value === true || value === 'true' ? 'Tersedia' : 'Penuh';
     if (key === 'isActive') return value === true || value === 'true' ? 'AKTIF' : 'NONAKTIF';
@@ -575,6 +574,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     const normalized = key.toLowerCase();
     if (normalized === 'createdat' || normalized === 'created_at') return 'Dibuat Pada';
     if (normalized === 'updatedat' || normalized === 'updated_at') return 'Diubah Pada';
+    if (normalized === 'isactive') return 'Status';
     return titleCase(key);
   };
   const detailValue = (key: string, value: any) => {
