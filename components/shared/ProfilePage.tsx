@@ -199,25 +199,27 @@ export default function ProfilePage({ role }: { role: string }) {
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
-              <div className="relative -mt-12 h-24 w-24 shrink-0 overflow-hidden rounded-full bg-blue-100 ring-4 ring-white shadow-sm">
-                {avatarSrc ? (
-                  <Image
-                    src={avatarSrc}
-                    alt="Foto profil"
-                    fill
-                    sizes="96px"
-                    unoptimized={Boolean(preview)}
-                    className="object-cover"
-                  />
-                ) : (
-                  <span className="grid h-full w-full place-items-center text-3xl font-bold text-blue-700">
-                    {initial}
-                  </span>
-                )}
+              <div className="relative -mt-12 h-24 w-24 shrink-0">
+                <div className="h-full w-full overflow-hidden rounded-full bg-blue-100 ring-4 ring-white shadow-sm">
+                  {avatarSrc ? (
+                    <Image
+                      src={avatarSrc}
+                      alt="Foto profil"
+                      fill
+                      sizes="96px"
+                      unoptimized={Boolean(preview)}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="grid h-full w-full place-items-center text-3xl font-bold text-blue-700">
+                      {initial}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-1 right-1 grid h-8 w-8 place-items-center rounded-full bg-blue-600 text-white ring-2 ring-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+                  className="absolute -bottom-1 -right-1 z-10 grid h-9 w-9 place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-2 ring-white transition hover:bg-blue-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
                   aria-label="Ganti foto profil"
                 >
                   <Camera size={14} />
