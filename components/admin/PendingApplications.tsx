@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { label, rowsOf } from '@/lib/api/client';
-import { idOf } from '@/lib/utils/resource';
+import { humanize, idOf } from '@/lib/utils/resource';
 import { recordActivity } from '@/lib/utils/activity-log';
 import { adminService } from '@/services/admin.service';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/shared/ConfirmDialog';
@@ -90,7 +90,7 @@ export default function PendingApplications() {
           recordActivity({
             action: approved ? 'Setujui' : 'Tolak',
             menu: 'Pengajuan Magang',
-            detail: `${label(application.siswa?.nama)} - ${status}`,
+            detail: `${label(application.siswa?.nama)} - ${humanize(status)}`,
           });
           setNotice(response?.message || `Pengajuan berhasil ${approved ? 'disetujui' : 'ditolak'}.`);
           setApplications(prev => prev.filter(item => idOf(item) !== id));

@@ -9,8 +9,11 @@ export function useAuth() {
   const [user, setUser] = useState<SessionUser | null>(null);
 
   useEffect(() => {
-    setUser(getUser());
+    const sync = () => setUser(getUser());
+    sync();
     requireAuth();
+    window.addEventListener('simmas-user-updated', sync);
+    return () => window.removeEventListener('simmas-user-updated', sync);
   }, []);
 
   return { user, logout: logoutSession, isAuthenticated: Boolean(user) };

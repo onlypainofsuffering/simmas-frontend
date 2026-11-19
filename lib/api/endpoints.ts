@@ -4,6 +4,7 @@ export const endpoints = {
   },
   admin: {
     monitoringSiswa: '/admin/monitoring/siswa',
+    monitoringSiswaAbsensi: (id: string | number) => `/admin/monitoring/siswa/${id}/absensi`,
     monitoringKunjungan: '/admin/monitoring/kunjungan',
     guru: '/admin/guru',
     guruActive: '/admin/guru?status=AKTIF',
@@ -37,4 +38,5 @@ export const endpoints = {
     adminPerusahaan: '/siswa/admin/perusahaan',
   },
   password: (role: string) => `/${role}/akun/ganti-password`,
+  profile: '/profil',
 };

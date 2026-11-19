@@ -5,6 +5,7 @@ import { magangService } from './magang.service';
 
 export const adminService = {
   getMonitoringStudents: () => api(endpoints.admin.monitoringSiswa),
+  getStudentAttendance: (id: string | number) => api(endpoints.admin.monitoringSiswaAbsensi(id)),
   getTeachers: () => api(endpoints.admin.guru),
   getActiveTeachers: () => api(endpoints.admin.guruActive),
   getKelas: () => api(endpoints.admin.kelas),

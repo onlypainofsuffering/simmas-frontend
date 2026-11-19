@@ -13,7 +13,12 @@ export const companyFields: Field[] = [
 export const resourceConfigs: Record<string, PageConfig> = {
   'admin:dashboard': { kind: 'dashboard' },
   'admin:monitoring-global': { kind: 'monitoring' },
-  'admin:monitoring siswa': { path: '/admin/monitoring/siswa', filters: ['kelas'], clientFilters: ['status'] },
+  'admin:monitoring siswa': {
+    path: '/admin/monitoring/siswa',
+    filters: ['kelas'],
+    clientFilters: ['status'],
+    actions: ['attendance'],
+  },
   'admin:Monitoring Kunjungan': { path: '/admin/monitoring/kunjungan', clientFilters: ['status'] },
   'admin:pengajuan-magang': { path: '/admin/pengajuan-magang', actions: ['approve', 'reject'] },
   'admin:kelas': {
@@ -75,7 +80,7 @@ export const resourceConfigs: Record<string, PageConfig> = {
   'admin:penempatan': { kind: 'placement' },
   'admin:Penempatan Data': {
     path: '/admin/penempatan',
-    filters: ['kelas', 'dudiId', 'posisi', 'status'],
+    filters: ['kelas', 'dudiId', 'status'],
     fields: [
       { name: 'dudiId', label: 'ID Perusahaan', type: 'number', required: true },
       { name: 'guruPembimbingId', label: 'ID Guru Pembimbing', type: 'number', required: true },
@@ -146,7 +151,7 @@ export const preferredColumns: Record<string, string[]> = {
   'admin:siswa': ['nama', 'nis', 'kelas', 'status', 'isActive'],
   'admin:guru': ['namalengkap', 'nip', 'alamat' , 'jurusan', 'isActive'],
   'admin:mitra': ['nama_perusahaan', 'bidang_usaha', 'direktur' , 'alamat', 'kontak', 'status', 'isActive'],
-  'admin:Penempatan Data': ['siswa', 'dudi', 'guruPembimbing', 'posisi', 'status'],
+  'admin:Penempatan Data': ['siswa', 'dudi', 'guruPembimbing', 'status'],
   'guru:siswa': ['siswa', 'penempatan'],
   'guru:dudi-bimbingan': ['nama_perusahaan', 'bidang_usaha', 'alamat', 'kontak'],
   'guru:jurnal': ['tanggalPelaksana', 'siswa', 'rincianKegiatan', 'status'],

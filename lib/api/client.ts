@@ -1,4 +1,5 @@
 import { TOKEN_KEY, USER_KEY } from '@/lib/auth/auth.config';
+import { humanize } from '@/lib/utils/resource';
 
 const configuredApiBase =
   process.env.NEXT_PUBLIC_API_URL ||
@@ -108,7 +109,5 @@ export function rowsOf(data: any): any[] {
 }
 
 export function label(v: any) {
-  if (v === null || v === undefined || v === '') return '-';
-  if (typeof v === 'object') return v.nama || v.namalengkap || v.nama_perusahaan || v.name || v.email || JSON.stringify(v);
-  return String(v);
+  return humanize(v);
 }

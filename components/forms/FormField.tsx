@@ -2,6 +2,7 @@ import type { Field } from '@/types/resource';
 import { Input } from '@/components/ui/Input';
 import { SelectField } from '@/components/ui/Select';
 import { cn } from '@/lib/utils/cn';
+import { humanize } from '@/lib/utils/resource';
 
 interface FormFieldProps {
   field: Field;
@@ -26,7 +27,7 @@ export function FormField({ field, value, onChange, isEdit = false }: FormFieldP
           placeholder={`Pilih ${field.label}`}
           options={(field.options || []).map(option => ({
             value: option,
-            label: field.name === 'kuota_peserta' ? (option === 'true' ? 'Tersedia' : 'Penuh') : option,
+            label: field.name === 'kuota_peserta' ? (option === 'true' ? 'Tersedia' : 'Penuh') : humanize(option),
           }))}
         />
       </label>

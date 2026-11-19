@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { dataOf, label } from '@/lib/api/client';
-import { cellValue } from '@/lib/utils/resource';
+import { cellValue, humanize } from '@/lib/utils/resource';
 import { recordActivity } from '@/lib/utils/activity-log';
 import { absensiService } from '@/services/absensi.service';
 import { siswaService } from '@/services/siswa.service';
@@ -127,7 +127,7 @@ export default function AttendancePage() {
           <div>
             <h2 className="text-sm font-bold text-slate-800">Status Kehadiran Hari Ini</h2>
             <p className="mt-1 text-[11px] text-slate-400">
-              {today ? `Status: ${today.statusAbsen}` : 'Belum melakukan absen masuk hari ini.'}
+              {today ? `Status: ${humanize(today.statusAbsen)}` : 'Belum melakukan absen masuk hari ini.'}
             </p>
           </div>
           <div className="flex gap-2">
@@ -162,9 +162,9 @@ export default function AttendancePage() {
                 disabled={checkedIn || loading}
                 onValueChange={setStatusAbsen}
                 options={[
-                  { value: 'HADIR', label: 'HADIR' },
-                  { value: 'IZIN', label: 'IZIN' },
-                  { value: 'SAKIT', label: 'SAKIT' },
+                      { value: 'HADIR', label: humanize('HADIR') },
+                      { value: 'IZIN', label: humanize('IZIN') },
+                      { value: 'SAKIT', label: humanize('SAKIT') },
                 ]}
               />
             </label>

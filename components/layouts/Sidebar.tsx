@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -16,6 +17,7 @@ import {
   Send,
   Users,
   UsersRound,
+  UserRound,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -36,6 +38,7 @@ const icons: Record<string, LucideIcon> = {
   Send,
   Users,
   UsersRound,
+  UserRound,
 };
 
 interface SidebarProps {
@@ -55,7 +58,14 @@ export default function Sidebar({ role, open, onClose }: SidebarProps) {
       }`}
     >
       <div className="flex h-14 items-center gap-3 border-b border-slate-100 px-5">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-600 font-bold text-white">S</div>
+        <Image
+          src="/Dynamic%20White%20S%20Logo%20on%20Blue.png"
+          alt="Logo SIMMAS"
+          width={36}
+          height={36}
+          priority
+          className="h-9 w-9 rounded-xl object-cover"
+        />
         <div>
           <div className="font-bold tracking-tight text-slate-800">SIMMAS</div>
           <div className="text-[9px] tracking-[.14em] text-slate-400">SISTEM INFORMASI MAGANG</div>

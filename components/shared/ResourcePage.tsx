@@ -1,10 +1,10 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Eye, Filter, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
+import { CalendarCheck, Check, Eye, Filter, Pencil, Plus, Save, Search, Trash2, X } from 'lucide-react';
 import { api, dataOf, json, label, rowsOf } from '@/lib/api/client';
 import { resourceConfigs, preferredColumns, statusChoices } from '@/constants/resource-config';
-import { cellValue, idOf, titleCase } from '@/lib/utils/resource';
+import { cellValue, humanize, idOf, titleCase } from '@/lib/utils/resource';
 import { formatDate, formatTime, toInputDate } from '@/lib/utils/format-date';
 import { recordActivity } from '@/lib/utils/activity-log';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -13,7 +13,9 @@ import { adminService } from '@/services/admin.service';
 import { guruService } from '@/services/guru.service';
 import { FormField } from '@/components/forms/FormField';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Feedback } from '@/components/shared/Feedback';
+import { InfoTile } from '@/components/shared/InfoTile';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SearchInput } from '@/components/shared/SearchInput';
 import { StatCard } from '@/components/dashboard/StatCard';
@@ -32,7 +34,7 @@ const pageDescriptions: Record<string, string> = {
   'monitoring siswa': 'Monitoring Siswa',
   'Monitoring Kunjungan': 'Monitoring Kunjungan',
   mitra: 'Kelola Dudi',
-  'Penempatan Data': 'Kelola Penempatan Data',
+  'Penempatan Data': 'Kelola Penempatan',
 };
 
 const addLabels: Record<string, string> = {
@@ -78,8 +80,22 @@ function filterLabel(key: string) {
   return key === 'dudiId' ? 'Dudi' : titleCase(key);
 }
 
+function sectionTitle(section: string) {
+  const title = titleCase(section).replace(/\s*\bData\b/g, '').trim();
+  return title || titleCase(section);
+}
+
+function attendanceTone(status: any) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'HADIR') return 'bg-emerald-50 text-emerald-700';
+  if (value === 'IZIN') return 'bg-blue-50 text-blue-700';
+  if (value === 'SAKIT') return 'bg-amber-50 text-amber-700';
+  return 'bg-rose-50 text-rose-700';
+}
+
 export default function ResourcePage({ role, section }: { role: string; section: string }) {
   const cfg = resourceConfigs[`${role}:${section}`] || {};
+  const displaySection = sectionTitle(section);
   const filterKeys = useMemo(
     () => Array.from(new Set([...(cfg.filters || []), ...(cfg.clientFilters || [])])),
     [cfg.filters, cfg.clientFilters],
@@ -96,6 +112,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
+  const [attendance, setAttendance] = useState<Row | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<Row[]>([]);
@@ -147,7 +164,12 @@ export default function ResourcePage({ role, section }: { role: string; section:
   };
   const cols = useMemo(() => {
     const keys = Array.from(new Set(data.slice(0, 8).flatMap(item => Object.keys(item || {}))));
-    const hidden = role === 'admin' && section === 'guru' ? ['status'] : [];
+    const hidden =
+      role === 'admin' && section === 'guru'
+        ? ['status']
+        : role === 'admin' && section === 'Penempatan Data'
+          ? ['posisi']
+          : [];
     const visible = keys.filter(
       key =>
         !['password', 'updatedat', 'createdat', 'role', 'fotoUrl'].includes(key.toLowerCase()) &&
@@ -423,6 +445,18 @@ export default function ResourcePage({ role, section }: { role: string; section:
     setErr('');
     setNotice('');
 
+    if (actionName === 'attendance') {
+      setDetailLoading(true);
+      try {
+        setAttendance(dataOf(await adminService.getStudentAttendance(id)));
+      } catch (error) {
+        setErr(errorMessage(error, 'Gagal memuat absensi siswa.'));
+      } finally {
+        setDetailLoading(false);
+      }
+      return;
+    }
+
     if (actionName === 'detail' && role === 'guru' && section === 'siswa') {
       setDetailLoading(true);
       try {
@@ -465,8 +499,8 @@ export default function ResourcePage({ role, section }: { role: string; section:
         askConfirm({
           title: approve ? 'Konfirmasi Persetujuan' : 'Konfirmasi Penolakan',
           message: approve
-            ? `Pengajuan ${titleCase(section)} akan disetujui. Lanjutkan?`
-            : `Pengajuan ${titleCase(section)} akan ditolak. Lanjutkan?`,
+            ? `Pengajuan ${displaySection} akan disetujui. Lanjutkan?`
+            : `Pengajuan ${displaySection} akan ditolak. Lanjutkan?`,
           confirmLabel: approve ? 'Setujui' : 'Tolak',
           tone: approve ? 'primary' : 'danger',
           onConfirm: () => runAction(async () => {
@@ -512,20 +546,20 @@ export default function ResourcePage({ role, section }: { role: string; section:
       }
 
       if (actionName === 'journal') {
-        const value = window.prompt('Keputusan jurnal (REVISI atau DISETUJUI_GURU):');
+        const value = window.prompt('Keputusan jurnal: Revisi atau Disetujui Guru (ketik REVISI / DISETUJUI_GURU):');
         if (value === null) return;
-        const status = value.trim();
+        const status = value.trim().toUpperCase().replace(/\s+/g, '_');
         if (!['REVISI', 'DISETUJUI_GURU'].includes(status)) {
-          throw new Error('Keputusan harus REVISI atau DISETUJUI_GURU.');
+          throw new Error('Keputusan harus Revisi atau Disetujui Guru.');
         }
         const catatanGuru = window.prompt('Catatan guru (opsional):') || '';
         askConfirm({
           title: 'Konfirmasi Keputusan Jurnal',
-          message: `Keputusan ${status} akan disimpan. Lanjutkan?`,
+          message: `Keputusan ${humanize(status)} akan disimpan. Lanjutkan?`,
           confirmLabel: 'Simpan',
           onConfirm: () => runAction(async () => {
             await guruService.decideJournal(id, { status, catatanGuru });
-            logChange('Ubah', `${identityOf(item)} - ${status}`);
+            logChange('Ubah', `${identityOf(item)} - ${humanize(status)}`);
           }),
         });
       }
@@ -569,11 +603,11 @@ export default function ResourcePage({ role, section }: { role: string; section:
     [clientFiltered],
   );
 
-  const resourceLabel = section === 'mitra' ? 'Dudi' : titleCase(section);
+  const resourceLabel = section === 'mitra' ? 'Dudi' : sectionTitle(section);
   const columnLabel = (key: string) => (key === 'isActive' ? 'Status' : titleCase(key));
   const displayValue = (key: string, value: any) => {
     if (key === 'kuota_peserta') return value === true || value === 'true' ? 'Tersedia' : 'Penuh';
-    if (key === 'isActive') return value === true || value === 'true' ? 'AKTIF' : 'NONAKTIF';
+    if (key === 'isActive') return value === true || value === 'true' ? 'Aktif' : 'Nonaktif';
     return label(value);
   };
   const isTimestampKey = (key: string) =>
@@ -598,7 +632,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
   return (
     <div className="space-y-5">
       <PageHeader
-        description={pageDescriptions[section] || `Kelola ${titleCase(section)}`}
+        description={pageDescriptions[section] || `Kelola ${displaySection}`}
       
       >
         {cfg.createPath && (
@@ -623,9 +657,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
 
       <div className="card overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-slate-800">Daftar {titleCase(section)}</h2>
-          </div>
+          <h2 className="text-sm font-bold text-slate-800">{displaySection}</h2>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             {filterKeys.length ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -662,7 +694,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                         onValueChange={value => setFilters({ ...filters, [key]: value })}
                         placeholder={filterLabel(key)}
                         emptyLabel={`Semua ${filterLabel(key)}`}
-                        options={(key === 'jurusan' ? ['RPL', 'TKJ', 'MM'] : statusChoices[section] || ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS']).map(value => ({ value, label: value }))}
+                        options={(key === 'jurusan' ? ['RPL', 'TKJ', 'MM'] : statusChoices[section] || ['BELUM_MAGANG', 'SEDANG_MAGANG', 'LULUS']).map(value => ({ value, label: humanize(value) }))}
                       />
                     ) : (
                       <Input
@@ -720,11 +752,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                                 : undefined
                             }
                           >
-                            {key === 'isActive'
-                              ? item.isActive
-                                ? 'AKTIF'
-                                : 'NONAKTIF'
-                              : displayValue(key, cellValue(item, key))}
+                            {displayValue(key, key === 'isActive' ? item.isActive : cellValue(item, key))}
                           </Badge>
                         ) : (
                           displayValue(key, cellValue(item, key))
@@ -742,6 +770,11 @@ export default function ResourcePage({ role, section }: { role: string; section:
                               <X size={15} />
                             </ActionButton>
                           </>
+                        )}
+                        {cfg.actions?.includes('attendance') && (
+                          <ActionButton title="Lihat Absensi" onClick={() => action(item, 'attendance')} color="text-emerald-600">
+                            <CalendarCheck size={15} />
+                          </ActionButton>
                         )}
                         {cfg.actions?.includes('edit') && (
                           <ActionButton title="Edit" onClick={() => openForm(item)} color="text-blue-600">
@@ -913,6 +946,54 @@ export default function ResourcePage({ role, section }: { role: string; section:
           </div>
         </Modal>
       )}
+
+      {attendance && (
+        <Modal title={`Absensi · ${label(attendance.siswa?.nama)}`} onClose={() => setAttendance(null)}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <InfoTile label="NIS" value={label(attendance.siswa?.nis)} />
+            <InfoTile label="Kelas" value={label(attendance.siswa?.kelas)} />
+            <InfoTile label="Total Absensi" value={label(attendance.riwayat_absensi?.length ?? 0)} />
+          </div>
+          <div className="mt-5">
+            <h3 className="text-xs font-bold text-slate-700">Riwayat Kehadiran</h3>
+            {attendance.riwayat_absensi?.length ? (
+              <div className="mt-2 max-h-72 overflow-auto">
+                <Table>
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      {['Tanggal', 'Status', 'Jam Masuk', 'Jam Pulang', 'Keterangan'].map(value => (
+                        <th key={value} className="px-3 py-2 font-semibold">
+                          {value}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {attendance.riwayat_absensi.map((item: Row) => (
+                      <tr key={item.id}>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {label(formatDate(item.tanggal, { day: '2-digit', month: 'short', year: 'numeric' }))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Badge className={attendanceTone(item.statusAbsen)}>{label(item.statusAbsen)}</Badge>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">{formatTime(item.jamMasuk)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">{formatTime(item.jamKeluar)}</td>
+                        <td className="px-3 py-2">{label(item.keterangan)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <EmptyState text="Belum ada riwayat absensi." />
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
       <ConfirmDialog
         open={Boolean(confirm)}
         title={confirm?.title || ''}

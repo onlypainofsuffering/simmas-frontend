@@ -33,6 +33,7 @@ export default function DashboardLayout({ role, children }: DashboardLayoutProps
           role={role}
           title={title}
           name={name}
+          photoUrl={user?.fotoUrl}
           passwordUrl={passwordUrl}
           onOpenMenu={() => setOpen(true)}
           onLogout={logout}

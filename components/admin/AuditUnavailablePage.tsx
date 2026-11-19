@@ -65,7 +65,7 @@ export default function AuditUnavailablePage() {
                             <TooltipTrigger asChild>
                               <button
                                 type="button"
-                                className="cursor-help rounded font-medium underline decoration-slate-300 decoration-dotted underline-offset-4 transition hover:text-blue-600 hover:decoration-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                                className="cursor-help rounded font-medium transition hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
                               >
                                 {formatTimeAgo(item.occurredAt)}
                               </button>
