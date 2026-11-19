@@ -13,6 +13,12 @@ import { adminService } from '@/services/admin.service';
 import { guruService } from '@/services/guru.service';
 import { FormField } from '@/components/forms/FormField';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import DateRangePicker, {
+  endOfDay,
+  parseDateValue,
+  startOfDay,
+  type DateRange,
+} from '@/components/ui/DateRangePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Feedback } from '@/components/shared/Feedback';
 import { InfoTile } from '@/components/shared/InfoTile';
@@ -113,12 +119,25 @@ export default function ResourcePage({ role, section }: { role: string; section:
   const [confirming, setConfirming] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
   const [attendance, setAttendance] = useState<Row | null>(null);
+  const [attendanceRange, setAttendanceRange] = useState<DateRange>({ from: null, to: null });
   const [detailLoading, setDetailLoading] = useState(false);
   const [dudiOptions, setDudiOptions] = useState<Row[]>([]);
   const [teacherOptions, setTeacherOptions] = useState<Row[]>([]);
   const [kelasMaster, setKelasMaster] = useState<Row[]>([]);
   const debouncedFilters = useDebounce(filters, 300);
   const debouncedQuery = useDebounce(query, 200);
+
+  const filteredAttendance = useMemo(() => {
+    const rows = (attendance?.riwayat_absensi || []) as Row[];
+    if (!attendanceRange.from && !attendanceRange.to) return rows;
+    const from = attendanceRange.from ? startOfDay(attendanceRange.from) : null;
+    const to = attendanceRange.to ? endOfDay(attendanceRange.to) : null;
+    return rows.filter(row => {
+      const date = parseDateValue(row.tanggal);
+      if (!date) return false;
+      return (!from || date >= from) && (!to || date <= to);
+    });
+  }, [attendance, attendanceRange]);
 
   const resolveFields = useCallback(
     (isEdit: boolean): Field[] => {
@@ -446,6 +465,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
     setNotice('');
 
     if (actionName === 'attendance') {
+      setAttendanceRange({ from: null, to: null });
       setDetailLoading(true);
       try {
         setAttendance(dataOf(await adminService.getStudentAttendance(id)));
@@ -952,11 +972,14 @@ export default function ResourcePage({ role, section }: { role: string; section:
           <div className="grid gap-3 sm:grid-cols-3">
             <InfoTile label="NIS" value={label(attendance.siswa?.nis)} />
             <InfoTile label="Kelas" value={label(attendance.siswa?.kelas)} />
-            <InfoTile label="Total Absensi" value={label(attendance.riwayat_absensi?.length ?? 0)} />
+            <InfoTile label="Total Absensi" value={label(filteredAttendance.length)} />
           </div>
           <div className="mt-5">
-            <h3 className="text-xs font-bold text-slate-700">Riwayat Kehadiran</h3>
-            {attendance.riwayat_absensi?.length ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-xs font-bold text-slate-700">Riwayat Kehadiran</h3>
+              <DateRangePicker value={attendanceRange} onChange={setAttendanceRange} />
+            </div>
+            {filteredAttendance.length ? (
               <div className="mt-2 max-h-72 overflow-auto">
                 <Table>
                   <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-400">
@@ -969,7 +992,7 @@ export default function ResourcePage({ role, section }: { role: string; section:
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {attendance.riwayat_absensi.map((item: Row) => (
+                    {filteredAttendance.map((item: Row) => (
                       <tr key={item.id}>
                         <td className="whitespace-nowrap px-3 py-2">
                           {label(formatDate(item.tanggal, { day: '2-digit', month: 'short', year: 'numeric' }))}
@@ -987,7 +1010,13 @@ export default function ResourcePage({ role, section }: { role: string; section:
               </div>
             ) : (
               <div className="mt-2">
-                <EmptyState text="Belum ada riwayat absensi." />
+                <EmptyState
+                  text={
+                    attendanceRange.from || attendanceRange.to
+                      ? 'Tidak ada absensi pada periode ini.'
+                      : 'Belum ada riwayat absensi.'
+                  }
+                />
               </div>
             )}
           </div>
