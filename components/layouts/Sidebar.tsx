@@ -17,7 +17,6 @@ import {
   Send,
   Users,
   UsersRound,
-  UserRound,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -38,7 +37,6 @@ const icons: Record<string, LucideIcon> = {
   Send,
   Users,
   UsersRound,
-  UserRound,
 };
 
 interface SidebarProps {
